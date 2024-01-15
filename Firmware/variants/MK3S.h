@@ -552,9 +552,14 @@
 #endif //Kuo ======
 
 //new settings is possible for vsense = 1, running current value > 31 set vsense to zero and shift both currents by 1 bit right (Z axis only)
+#ifdef EXTRUDER_GEARED
+#define TMC2130_CURRENTS_H {16, 20, 35, 25}  // default holding currents for all axes
+#define TMC2130_CURRENTS_R {16, 20, 35, 25}  // default running currents for all axes
+#else //EXTRUDER_GEARED
 #define TMC2130_CURRENTS_H {16, 20, 35, 30}  // default holding currents for all axes
-#define TMC2130_CURRENTS_FARM 36             // E 805 mA peak for ECool/farm mode
 #define TMC2130_CURRENTS_R {16, 20, 35, 30}  // default running currents for all axes
+#endif //EXTRUDER_GEARED
+#define TMC2130_CURRENTS_FARM 36             // E 805 mA peak for ECool/farm mode
 #define TMC2130_CURRENTS_R_HOME {8, 10, 20, 18}  // homing running currents for all axes
 
 #define TMC2130_STEALTH_Z
