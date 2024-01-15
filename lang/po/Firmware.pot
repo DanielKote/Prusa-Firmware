@@ -774,11 +774,6 @@ msgstr ""
 msgid "Front print fan?"
 msgstr ""
 
-#. MSG_BED_CORRECTION_FRONT c=14
-#: ../../Firmware/ultralcd.cpp:2687
-msgid "Front side[µm]"
-msgstr ""
-
 #. MSG_SELFTEST_FANS c=20
 #: ../../Firmware/ultralcd.cpp:6644
 msgid "Front/left fans"
@@ -1003,9 +998,49 @@ msgstr ""
 msgid "Left hotend fan?"
 msgstr ""
 
-#. MSG_BED_CORRECTION_LEFT c=14
-#: ../../Firmware/ultralcd.cpp:2685
-msgid "Left side [µm]"
+#. MSG_BED_CORRECTION_RL c=16
+#: ../../Firmware/ultralcd.cpp:2667
+msgid "Rear-Left [µm]"
+msgstr ""
+
+#. MSG_BED_CORRECTION_RM c=16
+#: ../../Firmware/ultralcd.cpp:2668
+msgid "Rear-Mid  [µm]"
+msgstr ""
+
+#. MSG_BED_CORRECTION_RR c=16
+#: ../../Firmware/ultralcd.cpp:2669
+msgid "Rear-Right[µm]"
+msgstr ""
+
+#. MSG_BED_CORRECTION_ML c=16
+#: ../../Firmware/ultralcd.cpp:2670
+msgid "Mid-Left  [µm]"
+msgstr ""
+
+#. MSG_BED_CORRECTION_MM c=16
+#: ../../Firmware/ultralcd.cpp:2671
+msgid "Center    [µm]"
+msgstr ""
+
+#. MSG_BED_CORRECTION_MR c=16
+#: ../../Firmware/ultralcd.cpp:2672
+msgid "Mid-Right [µm]"
+msgstr ""
+
+#. MSG_BED_CORRECTION_FL c=16
+#: ../../Firmware/ultralcd.cpp:2673
+msgid "Front-Left[µm]"
+msgstr ""
+
+#. MSG_BED_CORRECTION_FM c=16
+#: ../../Firmware/ultralcd.cpp:2674
+msgid "Front-Mid [µm]"
+msgstr ""
+
+#. MSG_BED_CORRECTION_FR c=16
+#: ../../Firmware/ultralcd.cpp:2675
+msgid "Frnt-Right[µm]"
 msgstr ""
 
 #. MSG_BL_HIGH c=12
@@ -1730,11 +1765,6 @@ msgstr ""
 msgid "RPi port"
 msgstr ""
 
-#. MSG_BED_CORRECTION_REAR c=14
-#: ../../Firmware/ultralcd.cpp:2688
-msgid "Rear side [µm]"
-msgstr ""
-
 #. MSG_RECOVERING_PRINT c=20
 #: ../../Firmware/power_panic.cpp:322
 msgid "Recovering print"
@@ -1809,11 +1839,6 @@ msgstr ""
 #. MSG_RIGHT c=10
 #: ../../Firmware/ultralcd.cpp:2455
 msgid "Right"
-msgstr ""
-
-#. MSG_BED_CORRECTION_RIGHT c=14
-#: ../../Firmware/ultralcd.cpp:2686
-msgid "Right side[µm]"
 msgstr ""
 
 #. MSG_WIZARD_RERUN c=20 r=7

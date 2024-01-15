@@ -2635,13 +2635,10 @@ static void lcd_babystep_z()
 
 
 typedef struct
-{	// 12bytes + 9bytes = 21bytes total
+{	// 12bytes + 1byte + 18bytes = 31bytes total
     menu_data_edit_t reserved; //12 bytes reserved for number editing functions
 	int8_t status;                   // 1byte
-	int16_t left;                    // 2byte
-	int16_t right;                   // 2byte
-	int16_t front;                   // 2byte
-	int16_t rear;                    // 2byte
+    int16_t bed_correction[3][3];  // 18byte
 } _menu_data_adjust_bed_t;
 static_assert(sizeof(menu_data)>= sizeof(_menu_data_adjust_bed_t),"_menu_data_adjust_bed_t doesn't fit into menu_data");
 
@@ -2657,10 +2654,15 @@ void lcd_adjust_bed_reset(void)
 //! @code{.unparsed}
 //! |01234567890123456789|
 //! |Settings:           |	MSG_SETTINGS
-//! |Left side [µm]:     |	MSG_BED_CORRECTION_LEFT
-//! |Right side[µm]:     |	MSG_BED_CORRECTION_RIGHT
-//! |Front side[µm]:     |	MSG_BED_CORRECTION_FRONT
-//! |Rear side [µm]:     |	MSG_BED_CORRECTION_REAR
+//! |Rear-Left [µm]:     |	MSG_BED_CORRECTION_RL
+//! |Rear-Mid  [µm]:     |	MSG_BED_CORRECTION_RM
+//! |Read-Right[µm]:     |	MSG_BED_CORRECTION_RR
+//! |Mid-Left  [µm]:     |	MSG_BED_CORRECTION_ML
+//! |Center    [µm]:     |	MSG_BED_CORRECTION_MM
+//! |Mid-Right [µm]:     |	MSG_BED_CORRECTION_MR
+//! |Front-Left[µm]:     |	MSG_BED_CORRECTION_FL
+//! |Front-Mid [µm]:     |	MSG_BED_CORRECTION_FM
+//! |Frnt-Right[µm]:     |	MSG_BED_CORRECTION_FR
 //! |Reset               |	MSG_BED_CORRECTION_RESET
 //! ----------------------
 //! @endcode
@@ -2672,27 +2674,33 @@ void lcd_adjust_bed(void)
         // Menu was entered.
         if (eeprom_read_byte((unsigned char*)EEPROM_BED_CORRECTION_VALID) == 1)
 		{
-			_md->left = (int8_t)eeprom_read_byte((uint8_t*)EEPROM_BED_CORRECTION_LEFT);
-			_md->right = (int8_t)eeprom_read_byte((uint8_t*)EEPROM_BED_CORRECTION_RIGHT);
-			_md->front = (int8_t)eeprom_read_byte((uint8_t*)EEPROM_BED_CORRECTION_FRONT);
-			_md->rear = (int8_t)eeprom_read_byte((uint8_t*)EEPROM_BED_CORRECTION_REAR);
-		}
+            for(uint_least8_t i = 0; i < 9; i++)
+            {
+                _md->bed_correction[i/3][i%3] = static_cast<int8_t>(eeprom_read_byte(reinterpret_cast<uint8_t*>
+                    (&EEPROM_Bed_Correction_base->c[i/3][i%3])));
+            }
+        }
         _md->status = 1;
     }
     MENU_BEGIN();
 	// leaving menu - this condition must be immediately before MENU_ITEM_BACK_P
     ON_MENU_LEAVE(
-        eeprom_update_byte((uint8_t*)EEPROM_BED_CORRECTION_LEFT, (uint8_t)_md->left);
-        eeprom_update_byte((uint8_t*)EEPROM_BED_CORRECTION_FRONT, (uint8_t)_md->front);
-        eeprom_update_byte((uint8_t*)EEPROM_BED_CORRECTION_REAR, (uint8_t)_md->rear);
-        eeprom_update_byte((uint8_t*)EEPROM_BED_CORRECTION_RIGHT, (uint8_t)_md->right);
+        for(uint_least8_t i = 0; i < 9; i++)
+        {
+            eeprom_update_byte(reinterpret_cast<uint8_t *>(&(EEPROM_Bed_Correction_base->c[i/3][i%3])), (uint8_t)_md->bed_correction[i/3][i%3]);
+        }
         eeprom_update_byte((uint8_t*)EEPROM_BED_CORRECTION_VALID, 1);
     );
     MENU_ITEM_BACK_P(_T(MSG_BACK));
-	MENU_ITEM_EDIT_int3_P(_i("Left side [\xe4m]"),  &_md->left,  -BED_ADJUSTMENT_UM_MAX, BED_ADJUSTMENT_UM_MAX);////MSG_BED_CORRECTION_LEFT c=14
-    MENU_ITEM_EDIT_int3_P(_i("Right side[\xe4m]"), &_md->right, -BED_ADJUSTMENT_UM_MAX, BED_ADJUSTMENT_UM_MAX);////MSG_BED_CORRECTION_RIGHT c=14
-    MENU_ITEM_EDIT_int3_P(_i("Front side[\xe4m]"), &_md->front, -BED_ADJUSTMENT_UM_MAX, BED_ADJUSTMENT_UM_MAX);////MSG_BED_CORRECTION_FRONT c=14
-    MENU_ITEM_EDIT_int3_P(_i("Rear side [\xe4m]"),  &_md->rear,  -BED_ADJUSTMENT_UM_MAX, BED_ADJUSTMENT_UM_MAX);////MSG_BED_CORRECTION_REAR c=14
+	MENU_ITEM_EDIT_int3_P(_i("Rear-Left [\xe4m]"),  &_md->bed_correction[2][0],  -BED_ADJUSTMENT_UM_MAX, BED_ADJUSTMENT_UM_MAX);////MSG_BED_CORRECTION_RL c=16
+	MENU_ITEM_EDIT_int3_P(_i("Rear-Mid  [\xe4m]"),  &_md->bed_correction[2][1],  -BED_ADJUSTMENT_UM_MAX, BED_ADJUSTMENT_UM_MAX);////MSG_BED_CORRECTION_RM c=16
+	MENU_ITEM_EDIT_int3_P(_i("Rear-Right[\xe4m]"),  &_md->bed_correction[2][2],  -BED_ADJUSTMENT_UM_MAX, BED_ADJUSTMENT_UM_MAX);////MSG_BED_CORRECTION_RR c=16
+	MENU_ITEM_EDIT_int3_P(_i("Mid-Left  [\xe4m]"),  &_md->bed_correction[1][0],  -BED_ADJUSTMENT_UM_MAX, BED_ADJUSTMENT_UM_MAX);////MSG_BED_CORRECTION_ML c=16
+	MENU_ITEM_EDIT_int3_P(_i("Center    [\xe4m]"),  &_md->bed_correction[1][1],  -BED_ADJUSTMENT_UM_MAX, BED_ADJUSTMENT_UM_MAX);////MSG_BED_CORRECTION_MM c=16
+	MENU_ITEM_EDIT_int3_P(_i("Mid-Right [\xe4m]"),  &_md->bed_correction[1][2],  -BED_ADJUSTMENT_UM_MAX, BED_ADJUSTMENT_UM_MAX);////MSG_BED_CORRECTION_MR c=16
+	MENU_ITEM_EDIT_int3_P(_i("Front-Left[\xe4m]"),  &_md->bed_correction[0][0],  -BED_ADJUSTMENT_UM_MAX, BED_ADJUSTMENT_UM_MAX);////MSG_BED_CORRECTION_FL c=16
+	MENU_ITEM_EDIT_int3_P(_i("Front-Mid [\xe4m]"),  &_md->bed_correction[0][1],  -BED_ADJUSTMENT_UM_MAX, BED_ADJUSTMENT_UM_MAX);////MSG_BED_CORRECTION_FM c=16
+	MENU_ITEM_EDIT_int3_P(_i("Frnt-Right[\xe4m]"),  &_md->bed_correction[0][2],  -BED_ADJUSTMENT_UM_MAX, BED_ADJUSTMENT_UM_MAX);////MSG_BED_CORRECTION_FR c=16
     MENU_ITEM_FUNCTION_P(_T(MSG_RESET), lcd_adjust_bed_reset);
     MENU_END();
 }

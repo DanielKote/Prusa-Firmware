@@ -46,6 +46,12 @@ typedef struct
 #ifdef __cplusplus
 static_assert(sizeof(Sheets) == EEPROM_SHEETS_SIZEOF, "Sizeof(Sheets) is not EEPROM_SHEETS_SIZEOF.");
 #endif
+
+typedef struct
+{
+    int8_t c[3][3]; //[y][x] with y: 0=front, 1=mid, 2=back and x: 0=left, 1=mid, 2=right
+} Bed_Correction;
+
 /** @defgroup eeprom_table EEPROM Table
  *
 
@@ -120,13 +126,13 @@ static_assert(sizeof(Sheets) == EEPROM_SHEETS_SIZEOF, "Sizeof(Sheets) is not EEP
 | 0x0FC0 4032 | bool    | EEPROM_BED_CORRECTION_VALID           | 00h 0        | 00h 0                 | Bed correction: __invalid__                         | ???          | D3 Ax0fc0 C1
 | ^           | ^       | ^                                     | ffh 255      | ^                     | Bed correction: __valid__                           | ???          | ^
 | 0x0FBF 4031 | char    | EEPROM_BED_CORRECTION_LEFT            | 00h ffh      | 00h 0                 | Bed manual correction left                        | LCD menu     | D3 Ax0fbf C1
-| ^           | ^       | ^                                     | ^            | ^                     | At this moment limited to +-100um                 | G80 Lxxx     | ^
+| ^           | ^       | ^   depreciated                       | ^            | ^                     | At this moment limited to +-100um                 | G80 Lxxx     | ^
 | 0x0FBE 4030 | char    | EEPROM_BED_CORRECTION_RIGHT           | 00h ffh      | 00h 0                 | Bed manual correction right                       | LCD menu     | D3 Ax0fbe C1
-| ^           | ^       | ^                                     | ^            | ^                     | At this moment limited to +-100um                 | G80 Rxxx     | ^
+| ^           | ^       | ^   depreciated                       | ^            | ^                     | At this moment limited to +-100um                 | G80 Rxxx     | ^
 | 0x0FBD 4029 | char    | EEPROM_BED_CORRECTION_FRONT           | 00h ffh      | 00h 0                 | Bed manual correction front                       | LCD menu     | D3 Ax0fbd C1
-| ^           | ^       | ^                                     | ^            | ^                     | At this moment limited to +-100um                 | G80 Fxxx     | ^
+| ^           | ^       | ^   depreciated                       | ^            | ^                     | At this moment limited to +-100um                 | G80 Fxxx     | ^
 | 0x0FBC 4028 | char    | EEPROM_BED_CORRECTION_BACK            | 00h ffh      | 00h 0                 | Bed manual correction back                        | LCD menu     | D3 Ax0fbc C1
-| ^           | ^       | ^                                     | ^            | ^                     | At this moment limited to +-100um                 | G80 Bxxx     | ^
+| ^           | ^       | ^   depreciated                       | ^            | ^                     | At this moment limited to +-100um                 | G80 Bxxx     | ^
 | 0x0FBB 4027 | bool    | EEPROM_TOSHIBA_FLASH_AIR_COMPATIBLITY | 00h 0        | ffh 255               | Toshiba Air: __off__                              | LCD menu     | D3 Ax0fbb C1
 | ^           | ^       | ^                                     | 01h 1        | ^                     | Toshiba Air: __on__                               | ^            | ^
 | 0x0FBA 4026 | uint8   | _EEPROM_FREE_NR3_                     | ???          | ???                   | _Free EEPROM space_                               | _free space_ | D3 Ax0fba C1
@@ -382,6 +388,8 @@ static_assert(sizeof(Sheets) == EEPROM_SHEETS_SIZEOF, "Sizeof(Sheets) is not EEP
 | 0x0C94 3220 | uint8   | EEPROM_KILL_PENDING_FLAG              | 42h, ffh     | ffh                   | Kill pending flag (0x42 magic value)              | kill()       | D3 Ax0c94 C1
 | 0x0C91 3217 | char[3] | EEPROM_FILENAME_EXTENSION             | ???          | ffffffffh             | DOS 8.3 filename extension                        | Power Panic  | D3 Ax0c91 C1
 | 0x0C80 3200 | char[17]| EEPROM_CUSTOM_MENDEL_NAME             | Prusa i3 MK3S| ffffffffffffffffff... | Custom Printer Name                               |              | D3 Ax0c80 C17
+| 0x0C77 3191 | ui[3][3]| EEPROM_BED_CORRECTION                 | 9x 00h ffh   | 00h 0                 | Bed manual correction [3][3]                      | LCD menu     | D3 Ax0c77 C9 (or Ax0c77->Ax0c7f C1 for individual correction values)
+| ^           | ^       | ^                                     | ^            | ^                     | At this moment limited to +-100um for each        | G80 Rxxx     | ^
 
 |Address begin|Bit/Type | Name                                  | Valid values | Default/FactoryReset  | Description                                       |Gcode/Function| Debug code
 | :--:        | :--:    | :--:                                  | :--:         | :--:                  | :--:                                              | :--:         | :--:
@@ -421,7 +429,7 @@ static_assert(sizeof(Sheets) == EEPROM_SHEETS_SIZEOF, "Sizeof(Sheets) is not EEP
 #define EEPROM_FREE_NR1 (EEPROM_FARM_MODE-1) // uint8_t
 #define _EEPROM_FREE_NR2_ (EEPROM_FREE_NR1 - 2) // int16_t
 
-// Correction of the bed leveling, in micrometers.
+// Correction of the bed leveling, in micrometers. The left/right/front/rear values are depreciated - now uses EEPROM_BED_CORRECTION[3][3] for 3x3 offsets
 // Maximum 50 micrometers allowed.
 // Bed correction is valid if set to 1. If set to zero or 255, the successive 4 bytes are invalid.
 #define EEPROM_BED_CORRECTION_VALID (_EEPROM_FREE_NR2_ - 1)
@@ -622,8 +630,10 @@ static Sheets * const EEPROM_Sheets_base = (Sheets*)(EEPROM_SHEETS_BASE);
 #define EEPROM_FILENAME_EXTENSION (EEPROM_KILL_PENDING_FLAG - 3) // 3 x char
 #define EEPROM_CUSTOM_MENDEL_NAME (EEPROM_FILENAME_EXTENSION-17) //char[17]
 
+#define EEPROM_BED_CORRECTION (EEPROM_CUSTOM_MENDEL_NAME-9) //int8[3][3]
+static Bed_Correction * const EEPROM_Bed_Correction_base = (Bed_Correction*)(EEPROM_BED_CORRECTION);
 //This is supposed to point to last item to allow EEPROM overrun check. Please update when adding new items.
-#define EEPROM_LAST_ITEM EEPROM_FILENAME_EXTENSION
+#define EEPROM_LAST_ITEM EEPROM_BED_CORRECTION
 // !!!!!
 // !!!!! this is end of EEPROM section ... all updates MUST BE inserted before this mark !!!!!
 // !!!!!
