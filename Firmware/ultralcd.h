@@ -65,6 +65,7 @@ void print_stop(bool interactive=false);
 void lcd_thermal_model_cal();
 #endif //THERMAL_MODEL
 void lcd_load_filament_color_check();
+void lcd_cooldown_check();
 
 extern void lcd_belttest();
 extern bool lcd_selftest();

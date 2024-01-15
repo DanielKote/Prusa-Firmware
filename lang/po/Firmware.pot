@@ -96,6 +96,11 @@ msgid ""
 "Autoloading filament is active, just press the knob and insert filament..."
 msgstr ""
 
+#. MSG_FILAMENT_COOLDOWN_CHECK c=5 r=1
+#: ../../Firmware/ultralcd.cpp:2246
+msgid "Start Cooldown?"
+msgstr ""
+
 #. MSG_PROGRESS_AVOID_GRIND c=20
 #: ../../Firmware/mmu2_progress_converter.cpp:16
 #: ../../Firmware/mmu2_progress_converter.cpp:42
