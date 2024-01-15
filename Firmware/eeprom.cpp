@@ -66,11 +66,10 @@ void eeprom_init()
 }
 
 void eeprom_adjust_bed_reset() {
-    eeprom_update_byte((uint8_t*)EEPROM_BED_CORRECTION_VALID, 1);
-    eeprom_update_byte((uint8_t*)EEPROM_BED_CORRECTION_LEFT, 0);
-    eeprom_update_byte((uint8_t*)EEPROM_BED_CORRECTION_RIGHT, 0);
-    eeprom_update_byte((uint8_t*)EEPROM_BED_CORRECTION_FRONT, 0);
-    eeprom_update_byte((uint8_t*)EEPROM_BED_CORRECTION_REAR, 0);
+    for(uint_least8_t j = 0; j < 9; j++)
+    {
+        eeprom_update_byte(reinterpret_cast<uint8_t *>(&(EEPROM_Bed_Correction_base->c[j/3][j%3])),0);
+    }
 }
 
 //! @brief Get default sheet name for index

@@ -787,11 +787,6 @@ msgstr ""
 msgid "Front print fan?"
 msgstr "Prednji print vent?"
 
-#. MSG_BED_CORRECTION_FRONT c=14
-#: ../../Firmware/ultralcd.cpp:2687
-msgid "Front side[µm]"
-msgstr "Prednj str[µm]"
-
 #. MSG_SELFTEST_FANS c=20
 #: ../../Firmware/ultralcd.cpp:6644
 msgid "Front/left fans"
@@ -1028,10 +1023,50 @@ msgstr "Lijevo"
 msgid "Left hotend fan?"
 msgstr "Lijevi hotend vent?"
 
-#. MSG_BED_CORRECTION_LEFT c=14
-#: ../../Firmware/ultralcd.cpp:2685
-msgid "Left side [µm]"
-msgstr "Lijeva str[µm]"
+#. MSG_BED_CORRECTION_RL c=16
+#: ../../Firmware/ultralcd.cpp:2667
+msgid "Rear-Left [µm]"
+msgstr "Strag-lijv[µm]"
+
+#. MSG_BED_CORRECTION_RM c=16
+#: ../../Firmware/ultralcd.cpp:2668
+msgid "Rear-Mid  [µm]"
+msgstr "Straž-sred[µm]"
+
+#. MSG_BED_CORRECTION_RR c=16
+#: ../../Firmware/ultralcd.cpp:2669
+msgid "Rear-Right[µm]"
+msgstr "Strag-desn[µm]"
+
+#. MSG_BED_CORRECTION_ML c=16
+#: ../../Firmware/ultralcd.cpp:2670
+msgid "Mid-Left  [µm]"
+msgstr "Sredn-lij [µm]"
+
+#. MSG_BED_CORRECTION_MM c=16
+#: ../../Firmware/ultralcd.cpp:2671
+msgid "Center    [µm]"
+msgstr "Centar    [µm]"
+
+#. MSG_BED_CORRECTION_MR c=16
+#: ../../Firmware/ultralcd.cpp:2672
+msgid "Mid-Right [µm]"
+msgstr "Sredn-desn[µm]"
+
+#. MSG_BED_CORRECTION_FL c=16
+#: ../../Firmware/ultralcd.cpp:2673
+msgid "Front-Left[µm]"
+msgstr "Predn-lijv[µm]"
+
+#. MSG_BED_CORRECTION_FM c=16
+#: ../../Firmware/ultralcd.cpp:2674
+msgid "Front-Mid [µm]"
+msgstr "Predn-sred[µm]"
+
+#. MSG_BED_CORRECTION_FR c=16
+#: ../../Firmware/ultralcd.cpp:2675
+msgid "Frnt-Right[µm]"
+msgstr "Predn-desn[µm]"
 
 #. MSG_BL_HIGH c=12
 #: ../../Firmware/messages.cpp:164 ../../Firmware/ultralcd.cpp:5536
@@ -1721,11 +1756,6 @@ msgstr "RED PUN"
 msgid "RPi port"
 msgstr "RPi utor"
 
-#. MSG_BED_CORRECTION_REAR c=14
-#: ../../Firmware/ultralcd.cpp:2688
-msgid "Rear side [µm]"
-msgstr "Zad. str.[µm]"
-
 #. MSG_RECOVERING_PRINT c=20
 #: ../../Firmware/power_panic.cpp:322
 msgid "Recovering print"
@@ -1788,11 +1818,6 @@ msgstr "Povratak izbornika"
 #: ../../Firmware/ultralcd.cpp:2455
 msgid "Right"
 msgstr "Tocno"
-
-#. MSG_BED_CORRECTION_RIGHT c=14
-#: ../../Firmware/ultralcd.cpp:2686
-msgid "Right side[µm]"
-msgstr "Desna str.[µm]"
 
 #. MSG_WIZARD_RERUN c=20 r=7
 #: ../../Firmware/ultralcd.cpp:3653

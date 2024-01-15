@@ -2787,6 +2787,11 @@ static void gcode_G28(bool home_x_axis, bool home_y_axis, bool home_z_axis)
 
 
 // G80 - Automatic mesh bed leveling
+//Parameters:
+//    N           : number of mesh points (3 or 7) - corresponds to 3x3 or 7x7 grids
+//    R           : probe retries (default 3, max 10)
+//    V           : Verbosity
+//    CDE HIJ OPQ : calibration for the 9-point bed correction in um (-100->100) (C:front-left, D:front-mid, E:front-right;   H:mid-left, I:center, J:mid-right;    O:back-left, P:back-mid, Q:back-right)
 static void gcode_G80()
 {
     constexpr float XY_AXIS_FEEDRATE = (homing_feedrate[X_AXIS] * 3) / 60;
@@ -3018,40 +3023,57 @@ static void gcode_G80()
 #endif
     babystep_apply(); // Apply Z height correction aka baby stepping before mesh bed leveing gets activated.
     
-    // Apply the bed level correction to the mesh
+    //Read the bed level correction from either the codes provided or EEPROM (if valid)
     bool eeprom_bed_correction_valid = eeprom_read_byte((unsigned char*)EEPROM_BED_CORRECTION_VALID) == 1;
-    auto bedCorrectHelper = [eeprom_bed_correction_valid] (char code, uint8_t *eep_address) -> int8_t {
-        if (code_seen(code)) {
-            // Verify value is within allowed range
-            int16_t temp = code_value_short();
-            if (abs(temp) > BED_ADJUSTMENT_UM_MAX) {
-                printf_P(PSTR("%SExcessive bed leveling correction: %i microns\n"), errormagic, temp);
-            } else {
-                return (int8_t)temp; // Value is valid, use it
-            }
-        } else if (eeprom_bed_correction_valid) {
-            return (int8_t)eeprom_read_byte(eep_address);
-        }
-        return 0;
-    };
-    const int8_t correction[4] = {
-        bedCorrectHelper('L', (uint8_t*)EEPROM_BED_CORRECTION_LEFT),
-        bedCorrectHelper('R', (uint8_t*)EEPROM_BED_CORRECTION_RIGHT),
-        bedCorrectHelper('F', (uint8_t*)EEPROM_BED_CORRECTION_FRONT),
-        bedCorrectHelper('B', (uint8_t*)EEPROM_BED_CORRECTION_REAR),
-    };
+    mesh_bed_leveling mbl_corrections;
+    mbl_corrections.reset();
     for (uint8_t row = 0; row < MESH_NUM_Y_POINTS; row++) {
         for (uint8_t col = 0; col < MESH_NUM_X_POINTS; col++) {
-            constexpr float scaler = 0.001f / (MESH_NUM_X_POINTS - 1);
-            mbl.z_values[row][col] += scaler * (
-              + correction[0] * (MESH_NUM_X_POINTS - 1 - col)
-              + correction[1] * col
-              + correction[2] * (MESH_NUM_Y_POINTS - 1 - row)
-              + correction[3] * row);
+            static const char codes[3][3] PROGMEM = {{'C','D','E'},{'H','I','J'},{'O','P','Q'} };
+            if((row % 3 == 0) && (col % 3 == 0)) { //is on 3x3 grid
+                if (code_seen(pgm_read_byte(&codes[row/3][col/3]))) {
+                    // Verify value is within allowed range
+                    int32_t temp = code_value_long();
+                    if (labs(temp) > BED_ADJUSTMENT_UM_MAX) {
+                        SERIAL_ERROR_START;
+                        SERIAL_ECHOPGM("Excessive bed leveling correction: ");
+                        SERIAL_ECHO(temp);
+                        SERIAL_ECHOLNPGM(" microns");
+                        mbl_corrections.set_z(col, row, 0);
+                    } else {
+                        // Value is valid, save it
+                        mbl_corrections.set_z(col, row, (int16_t)temp);
+                    }
+                }
+                else if (eeprom_bed_correction_valid) {
+                    mbl_corrections.set_z(col, row, (int8_t)eeprom_read_byte(reinterpret_cast<uint8_t *>(&(EEPROM_Bed_Correction_base->c[row/3][col/3]))));
+                } else {
+                    mbl_corrections.set_z(col, row, 0);
+                }
+            } else {
+                mbl_corrections.set_z(col, row, NAN);
+            }
         }
     }
 
-    mbl.upsample_3x3(); //interpolation from 3x3 to 7x7 points using largrangian polynomials while using the same array z_values[iy][ix] for storing (just coppying measured data to new destination and interpolating between them)
+    // Apply the bed level correction to the mesh
+    if (nMeasPoints == 3) { //add the correction values to mbl and then upscale mbl to 7x7
+        for (uint8_t row = 0; row < MESH_NUM_Y_POINTS; row++) {
+            for (uint8_t col = 0; col < MESH_NUM_X_POINTS; col++) {
+                if ((row % 3 == 0) && (col % 3 == 0)) {
+                    mbl.z_values[row][col] += 0.001f * mbl_corrections.z_values[row][col];
+                }
+            }
+        }
+        mbl.upsample_3x3(); //interpolation from 3x3 to 7x7 points using largrangian polynomials while using the same array z_values[iy][ix] for storing (just coppying measured data to new destination and interpolating between them)
+    } else { //nMeasPoints == 7; upscale the correction values, then add them to mbl (which is 7x7)
+        mbl_corrections.upsample_3x3();
+        for (uint8_t row = 0; row < MESH_NUM_Y_POINTS; row++) {
+            for (uint8_t col = 0; col < MESH_NUM_X_POINTS; col++) {
+                mbl.z_values[row][col] += 0.001f * mbl_corrections.z_values[row][col];
+            }
+        }
+    }
 
     uint8_t useMagnetCompensation = code_seen('M') ? code_value_uint8() : eeprom_read_byte((uint8_t*)EEPROM_MBL_MAGNET_ELIMINATION);
     if (nMeasPoints == 7 && useMagnetCompensation) {
