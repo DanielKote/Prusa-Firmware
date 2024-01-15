@@ -2256,6 +2256,15 @@ void lcd_load_filament_color_check()
 	}
 }
 
+void lcd_cooldown_check()
+{
+    uint8_t cooldown = lcd_show_fullscreen_message_yes_no_and_wait_P(_i("Start Cooldown?"), false, LCD_LEFT_BUTTON_CHOICE);////MSG_FILAMENT_COOLDOWN_CHECK c=5 r=1
+    if (cooldown == LCD_LEFT_BUTTON_CHOICE) {
+        begin_cooldown();
+        st_synchronize();
+    }
+}
+
 #ifdef FILAMENT_SENSOR
 static void lcd_menu_AutoLoadFilament()
 {

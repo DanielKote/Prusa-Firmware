@@ -453,6 +453,7 @@ void M600_load_filament_movements();
 void M600_wait_for_user();
 bool M600_check_state_and_repeat();
 void load_filament_final_feed();
+void begin_cooldown();
 void marlin_wait_for_click();
 float raise_z(float delta);
 void raise_z_above(float target);

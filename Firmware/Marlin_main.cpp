@@ -3569,6 +3569,13 @@ void gcode_M701(float fastLoadLength, uint8_t mmuSlotIndex){
 
         if (!farm_mode && (eFilamentAction != FilamentAction::None)) {
             lcd_load_filament_color_check();
+            if(eFilamentAction != FilamentAction::MmuCut &&
+                eFilamentAction != FilamentAction::MmuEject &&
+                eFilamentAction != FilamentAction::MmuLoad &&
+                eFilamentAction != FilamentAction::MmuLoadingTest &&
+                eFilamentAction != FilamentAction::MmuUnLoad) {
+                    lcd_cooldown_check();
+                }
         }
 
         #ifdef COMMUNITY_PREVENT_OOZE
@@ -8878,7 +8885,10 @@ Sigma_Exit:
 
         // Unload filament
         if (MMU2::mmu2.Enabled())  MMU2::mmu2.unload();
-        else unload_filament(unloadLength);
+        else {
+            unload_filament(unloadLength);
+            lcd_cooldown_check();
+        }
 
         // Restore Z axis
         raise_z(-delta);
@@ -11236,6 +11246,12 @@ void load_filament_final_feed()
 {
 	current_position[E_AXIS]+= FILAMENTCHANGE_FINALFEED;
 	plan_buffer_line_curposXYZE(FILAMENTCHANGE_EFEED_FINAL);
+}
+
+void begin_cooldown()
+{
+    setTargetBed(0);
+    setTargetHotend(0);
 }
 
 //! @brief Wait for user to check the state
