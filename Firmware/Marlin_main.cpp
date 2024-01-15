@@ -2787,11 +2787,6 @@ static void gcode_G28(bool home_x_axis, bool home_y_axis, bool home_z_axis)
 
 
 // G80 - Automatic mesh bed leveling
-//Parameters:
-//    N           : number of mesh points (3 or 7) - corresponds to 3x3 or 7x7 grids
-//    R           : probe retries (default 3, max 10)
-//    V           : Verbosity
-//    CDE HIJ OPQ : calibration for the 9-point bed correction in um (-100->100) (C:front-left, D:front-mid, E:front-right;   H:mid-left, I:center, J:mid-right;    O:back-left, P:back-mid, Q:back-right)
 static void gcode_G80()
 {
     constexpr float XY_AXIS_FEEDRATE = (homing_feedrate[X_AXIS] * 3) / 60;
@@ -3029,7 +3024,7 @@ static void gcode_G80()
     mbl_corrections.reset();
     for (uint8_t row = 0; row < MESH_NUM_Y_POINTS; row++) {
         for (uint8_t col = 0; col < MESH_NUM_X_POINTS; col++) {
-            static const char codes[3][3] PROGMEM = {{'C','D','E'},{'H','I','J'},{'O','P','Q'} };
+            static const char codes[3][3] PROGMEM = {{'D','E','F'},{'H','I','J'},{'P','Q','R'} };
             if((row % 3 == 0) && (col % 3 == 0)) { //is on 3x3 grid
                 if (code_seen(pgm_read_byte(&codes[row/3][col/3]))) {
                     // Verify value is within allowed range
@@ -4966,10 +4961,9 @@ void process_commands()
       
       Using the following parameters enables additional "manual" bed leveling correction. Valid values are -100 microns to 100 microns.
     #### Additional Parameters
-      - `L` - Left Bed Level correct value in um.
-      - `R` - Right Bed Level correct value in um.
-      - `F` - Front Bed Level correct value in um.
-      - `B` - Back Bed Level correct value in um.
+      - 'D' / 'E' / 'F' - Left / Middle / Right Bed Level correction value in um for the front of the bed
+      - 'H' / 'I' / 'J' - Left / Middle / Right Bed Level correction value in um for the middle of the bed
+      - 'P' / 'Q' / 'R' - Left / Middle / Right Bed Level correction value in um for the back of the bed
 
       The following parameters are used to define the area used by the print:
       - `X` - area lower left point X coordinate
