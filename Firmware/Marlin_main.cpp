@@ -156,6 +156,7 @@ CardReader card;
 
 float default_retraction = DEFAULT_RETRACTION;
 
+float homing_feedrate[] = HOMING_FEEDRATE;
 
 //Although this flag and many others like this could be represented with a struct/bitfield for each axis (more readable and efficient code), the implementation
 //would not be standard across all platforms. That being said, the code will continue to use bitmasks for independent axis.
@@ -1305,8 +1306,10 @@ void setup()
 	tmc2130_mres[Z_AXIS] = tmc2130_usteps2mres(cs.axis_ustep_resolution[Z_AXIS]);
 	tmc2130_mres[E_AXIS] = tmc2130_usteps2mres(cs.axis_ustep_resolution[E_AXIS]);
 #else //TMC2130_VARIABLE_RESOLUTION
-	tmc2130_mres[X_AXIS] = tmc2130_usteps2mres(TMC2130_USTEPS_XY);
-	tmc2130_mres[Y_AXIS] = tmc2130_usteps2mres(TMC2130_USTEPS_XY);
+	//tmc2130_mres[X_AXIS] = tmc2130_usteps2mres(TMC2130_USTEPS_XY); //Prusa default active
+	//tmc2130_mres[Y_AXIS] = tmc2130_usteps2mres(TMC2130_USTEPS_XY); //Prusa default active
+    tmc2130_mres[X_AXIS] = tmc2130_usteps2mres(TMC2130_USTEPS_X); //Kuo / brv
+    tmc2130_mres[Y_AXIS] = tmc2130_usteps2mres(TMC2130_USTEPS_Y); //Kuo / brv
 	tmc2130_mres[Z_AXIS] = tmc2130_usteps2mres(TMC2130_USTEPS_Z);
 	tmc2130_mres[E_AXIS] = tmc2130_usteps2mres(TMC2130_USTEPS_E);
 #endif //TMC2130_VARIABLE_RESOLUTION
@@ -2285,7 +2288,8 @@ void homeaxis(uint8_t axis, uint8_t cnt)
 #ifdef TMC2130
 		uint8_t orig = tmc2130_home_origin[axis];
 		uint8_t back = tmc2130_home_bsteps[axis];
-		if (tmc2130_home_enabled && (orig <= 63))
+		//if (tmc2130_home_enabled && (orig <= 63)) //Prusa default active
+        if (tmc2130_home_enabled && (orig <= kHOMING_CNT_MIN))
 		{
 			tmc2130_goto_step(axis, orig, 2, 1000, tmc2130_get_res(axis));
 			if (back > 0)
@@ -2789,8 +2793,8 @@ static void gcode_G28(bool home_x_axis, bool home_y_axis, bool home_z_axis)
 // G80 - Automatic mesh bed leveling
 static void gcode_G80()
 {
-    constexpr float XY_AXIS_FEEDRATE = (homing_feedrate[X_AXIS] * 3) / 60;
-    constexpr float Z_LIFT_FEEDRATE = homing_feedrate[Z_AXIS] / 60;
+    float XY_AXIS_FEEDRATE = (homing_feedrate[X_AXIS] * 3) / 60;
+    float Z_LIFT_FEEDRATE = homing_feedrate[Z_AXIS] / 60;
     constexpr float Z_CALIBRATION_THRESHOLD = 0.35f;
     constexpr float MESH_HOME_Z_SEARCH_FAST = 0.35f;
     st_synchronize();
@@ -8523,7 +8527,167 @@ Sigma_Exit:
     }
     break;
 
+//Kuo mCodes enabled by TMC2130_SERVICE_CODES_M910_M918 ===
+    case 919: //! M919 - Set TMC2130 toff Kuo
+    {
+        uint8_t a = 0;
+        uint8_t theValue;
+
+        if (code_seen('X'))
+        {
+            a = 0;
+            theValue = code_value();
+        }
+        if (code_seen('Y'))
+        {
+            a = 1;
+            theValue = code_value();
+        }
+        if (code_seen('Z'))
+        {
+            a = 2;
+            theValue = code_value();
+        }
+        if (code_seen('E'))
+        {
+            a = 3;
+            theValue = code_value();
+        }
+
+        tmc2130_chopper_config[a].toff = theValue;
+        printf_P(_N("tmc2130_toff[%c]=%d\n"), "XYZE"[a], tmc2130_chopper_config[a].toff);
+
+        tmc2130_setup_chopper(a, tmc2130_mres[a], tmc2130_current_h[a], tmc2130_current_r[a]);
+
+    }
+    break;
+
+    case 920: //! M920 - Set TMC2130 hstr Kuo
+    {
+        uint8_t a = 0;
+        uint8_t theValue;
+
+        if (code_seen('X'))
+        {
+            a = 0;
+            theValue = code_value();
+        }
+        if (code_seen('Y'))
+        {
+            a = 1;
+            theValue = code_value();
+        }
+        if (code_seen('Z'))
+        {
+            a = 2;
+            theValue = code_value();
+        }
+        if (code_seen('E'))
+        {
+            a = 3;
+            theValue = code_value();
+        }
+
+        tmc2130_chopper_config[a].hstr = theValue;
+        printf_P(_N("tmc2130_hstr[%c]=%d\n"), "XYZE"[a], tmc2130_chopper_config[a].hstr);
+
+        tmc2130_setup_chopper(a, tmc2130_mres[a], tmc2130_current_h[a], tmc2130_current_r[a]);
+
+    }
+    break;
+
+    case 921: //! M921 - Set TMC2130 hend Kuo
+    {
+        uint8_t a = 0;
+        uint8_t theValue;
+
+        if (code_seen('X'))
+        {
+            a = 0;
+            theValue = code_value();
+        }
+        if (code_seen('Y'))
+        {
+            a = 1;
+            theValue = code_value();
+        }
+        if (code_seen('Z'))
+        {
+            a = 2;
+            theValue = code_value();
+        }
+        if (code_seen('E'))
+        {
+            a = 3;
+            theValue = code_value();
+        }
+
+        tmc2130_chopper_config[a].hend = theValue;
+        printf_P(_N("tmc2130_hend[%c]=%d\n"), "XYZE"[a], tmc2130_chopper_config[a].hend);
+
+        tmc2130_setup_chopper(a, tmc2130_mres[a], tmc2130_current_h[a], tmc2130_current_r[a]);
+    }
+    break;
+
+    case 922: //! M922 - Set TMC2130 tbl Kuo
+    {
+        uint8_t a = 0;
+        uint8_t theValue;
+
+        if (code_seen('X'))
+        {
+            a = 0;
+            theValue = code_value();
+        }
+        if (code_seen('Y'))
+        {
+            a = 1;
+            theValue = code_value();
+        }
+        if (code_seen('Z'))
+        {
+            a = 2;
+            theValue = code_value();
+        }
+        if (code_seen('E'))
+        {
+            a = 3;
+            theValue = code_value();
+        }
+
+        tmc2130_chopper_config[a].tbl = theValue;
+        printf_P(_N("tmc2130_tbl[%c]=%d\n"), "XYZE"[a], tmc2130_chopper_config[a].tbl);
+
+        tmc2130_setup_chopper(a, tmc2130_mres[a], tmc2130_current_h[a], tmc2130_current_r[a]);
+
+    }
+    break;
+    //end Kuo m-Codes enabled by TMC2130_SERVICE_CODES_M910_M918 ===
+
 #endif //TMC2130_SERVICE_CODES_M910_M918
+
+    //Kuo MCodes that are always available
+    case 924: //! M924 - Set sg_thrs_home Kuo
+    {
+        if (code_seen('X')) tmc2130_sg_thr_home[X_AXIS] = code_value();
+        if (code_seen('Y')) tmc2130_sg_thr_home[Y_AXIS] = code_value();
+        if (code_seen('Z')) tmc2130_sg_thr_home[Z_AXIS] = code_value();
+        if (code_seen('E')) tmc2130_sg_thr_home[E_AXIS] = code_value();
+        for (uint8_t a = X_AXIS; a <= E_AXIS; a++)
+            printf_P(_N("tmc2130_sg_thr_home[%c]=%d\n"), "XYZE"[a], tmc2130_sg_thr_home[a]);
+    }
+    break;
+
+    case 925: //! M925 - Set homing feed rate Kuo
+    {
+        if (code_seen('X')) homing_feedrate[X_AXIS] = code_value();
+        if (code_seen('Y')) homing_feedrate[Y_AXIS] = code_value();
+        if (code_seen('Z')) homing_feedrate[Z_AXIS] = code_value();
+        for (uint8_t a = X_AXIS; a <= Z_AXIS; a++)
+            printf_P(_N("homing_feedrate[%c]=%f\n"), "XYZE"[a], homing_feedrate[a]);
+    }
+    break;
+    //Kuo end MCodes that are always available ===
 
     /*!
 	### M350 - Set microstepping mode <a href="https://reprap.org/wiki/G-code#M350:_Set_microstepping_mode">M350: Set microstepping mode</a>

@@ -226,7 +226,7 @@ enum class HeatingStatus : uint8_t
 extern HeatingStatus heating_status;
 
 extern bool fans_check_enabled;
-constexpr float homing_feedrate[] = HOMING_FEEDRATE;
+extern float homing_feedrate[];
 extern uint8_t axis_relative_modes;
 extern float feedrate;
 extern int feedmultiply;
