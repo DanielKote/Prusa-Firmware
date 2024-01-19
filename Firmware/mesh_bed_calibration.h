@@ -176,7 +176,12 @@ enum BedSkewOffsetDetectionResultType {
 	BED_SKEW_OFFSET_DETECTION_SKEW_EXTREME		= 2   //!< Extremely skewed.
 };
 
-bool find_bed_induction_sensor_point_z(float minimum_z = -10.f, uint8_t n_iter = 3, int verbosity_level = 0);
+bool find_bed_induction_sensor_point_z(float minimum_z = -10.f, uint8_t n_iter = 3, int verbosity_level = 0, bool clicky = false);
+#ifdef CLICKY_BED_PROBE
+FORCE_INLINE bool find_bed_clicky_sensor_point_z(float minimum_z = -10.f, uint8_t n_iter = 3, int verbosity_level = 0) {return find_bed_induction_sensor_point_z(minimum_z, n_iter, verbosity_level, true); }
+bool pick_up_clicky();
+bool drop_off_clicky(float expected_z = -1.0f);
+#endif //CLICKY_BED_PROBE
 BedSkewOffsetDetectionResultType find_bed_induction_sensor_point_xy(int verbosity_level = 0);
 void go_home_with_z_lift();
 

@@ -39,7 +39,9 @@
 #define Y_TMC2130_DIAG      69
 #define Y_STEP_PIN          36
 #define Y_DIR_PIN           48
-#define Y_MIN_PIN           11
+#ifndef CLICKY_BED_PROBE
+#define Y_MIN_PIN           11	//being used for the CLICKY pin
+#endif
 //#define Y_MAX_PIN           24
 //#define Y_MIN_PIN           Y_TMC2130_DIAG
 #define Y_MAX_PIN           Y_TMC2130_DIAG
@@ -57,6 +59,10 @@
 #define Z_ENABLE_PIN        27
 #define Z_MS1_PIN           -1
 #define Z_MS2_PIN           -1
+
+#ifdef CLICKY_BED_PROBE
+#define Z_CLICKY_PIN		11 //taking over from the Y_MIN_PIN which isnt being used by the MK3S+ design
+#endif
 
 #define HEATER_BED_PIN       4 //PG5
 #define TEMP_BED_PIN         2 //A2

@@ -15,10 +15,10 @@ float mesh_bed_leveling::get_z(float x, float y) {
     int   i, j;
     float s, t;
     
-    i = int(floor((x - (BED_X0 + X_PROBE_OFFSET_FROM_EXTRUDER)) / x_mesh_density));
+    i = int(floor((x - (BED_X0 + MBL_X_PROBE_OFFSET_FROM_EXTRUDER)) / x_mesh_density));
     if (i < 0) {
         i = 0;
-        s = (x - (BED_X0 + X_PROBE_OFFSET_FROM_EXTRUDER)) / x_mesh_density;
+        s = (x - (BED_X0 + MBL_X_PROBE_OFFSET_FROM_EXTRUDER)) / x_mesh_density;
     } else {
         if (i > MESH_NUM_X_POINTS - 2) {
             i = MESH_NUM_X_POINTS - 2;
@@ -26,10 +26,10 @@ float mesh_bed_leveling::get_z(float x, float y) {
         s = (x - get_x(i)) / x_mesh_density;
     }
 
-    j = int(floor((y - (BED_Y0 + Y_PROBE_OFFSET_FROM_EXTRUDER)) / y_mesh_density));
+    j = int(floor((y - (BED_Y0 + MBL_Y_PROBE_OFFSET_FROM_EXTRUDER)) / y_mesh_density));
     if (j < 0) {
         j = 0;
-        t = (y - (BED_Y0 + Y_PROBE_OFFSET_FROM_EXTRUDER)) / y_mesh_density;
+        t = (y - (BED_Y0 + MBL_Y_PROBE_OFFSET_FROM_EXTRUDER)) / y_mesh_density;
     } else {
         if (j > MESH_NUM_Y_POINTS - 2) {
             j = MESH_NUM_Y_POINTS - 2;
@@ -51,9 +51,9 @@ void mesh_bed_leveling::upsample_3x3()
     int idx2 = MESH_NUM_X_POINTS - 1;
     {
         // First interpolate the points in X axis.
-        static const float x0 = (BED_X0 + X_PROBE_OFFSET_FROM_EXTRUDER);
-        static const float x1 = 0.5f * float(BED_X0 + BED_Xn) + X_PROBE_OFFSET_FROM_EXTRUDER;
-        static const float x2 = BED_Xn + X_PROBE_OFFSET_FROM_EXTRUDER;
+        static const float x0 = (BED_X0 + MBL_X_PROBE_OFFSET_FROM_EXTRUDER);
+        static const float x1 = 0.5f * float(BED_X0 + BED_Xn) + MBL_X_PROBE_OFFSET_FROM_EXTRUDER;
+        static const float x2 = BED_Xn + MBL_X_PROBE_OFFSET_FROM_EXTRUDER;
         for (int j = 0; j < MESH_NUM_Y_POINTS; ++ j) {
             // Interpolate the remaining values by Largrangian polynomials.
             for (int i = 0; i < MESH_NUM_X_POINTS; ++ i) {
@@ -69,9 +69,9 @@ void mesh_bed_leveling::upsample_3x3()
     }
     {
         // Second interpolate the points in Y axis.
-        static const float y0 = (BED_Y0 + Y_PROBE_OFFSET_FROM_EXTRUDER);
-        static const float y1 = 0.5f * float(BED_Y0 + BED_Yn) + Y_PROBE_OFFSET_FROM_EXTRUDER;
-        static const float y2 = BED_Yn + Y_PROBE_OFFSET_FROM_EXTRUDER;
+        static const float y0 = (BED_Y0 + MBL_Y_PROBE_OFFSET_FROM_EXTRUDER);
+        static const float y1 = 0.5f * float(BED_Y0 + BED_Yn) + MBL_Y_PROBE_OFFSET_FROM_EXTRUDER;
+        static const float y2 = BED_Yn + MBL_Y_PROBE_OFFSET_FROM_EXTRUDER;
         for (int i = 0; i < MESH_NUM_X_POINTS; ++ i) {
             // Interpolate the remaining values by Largrangian polynomials.
             for (int j = 1; j + 1 < MESH_NUM_Y_POINTS; ++ j) {

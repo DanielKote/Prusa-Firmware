@@ -154,6 +154,36 @@ msgid ""
 "reset."
 msgstr ""
 
+#. MSG_BED_LEVELING_FAILED_CLICKY_PIN_NOT_FOIND c=20 r=2?
+#: ../../Firmware/mesh_bed_calibration.cpp:2898 ../../Firmware/messages.cpp:18
+msgid ""
+"Bed leveling failed. Coulnt pick up Clicky pin."
+msgstr ""
+
+#. MSG_BED_LEVELING_FAILED_CANT_DEPOSIT_CLICKY_PIN c=20 r=3?
+#: ../../Firmware/mesh_bed_calibration.cpp:2898 ../../Firmware/messages.cpp:19
+msgid ""
+"Bed leveling failed. Couldnt drop off Clicky pin"
+msgstr ""
+
+#. MSG_BED_LEVELING_PICKING_UP_CLICKY c=20 r=2?
+#: ../../Firmware/mesh_bed_calibration.cpp:2898 ../../Firmware/messages.cpp:20
+msgid ""
+"Bed leveling started. Picking up Clicky"
+msgstr ""
+
+#. MSG_BED_LEVELING_DROPPING_OFF_CLICKY c=20 r=2?
+#: ../../Firmware/mesh_bed_calibration.cpp:2898 ../../Firmware/messages.cpp:21
+msgid ""
+"Bed leveling finishing. Dropping off Clicky"
+msgstr ""
+
+#. MSG_MBL_ZZ_FAIL c=20 r=2?
+#: ../../Firmware/mesh_bed_calibration.cpp:2898 ../../Firmware/messages.cpp:21
+msgid ""
+"Mesh bed leveling failed. Cant find 0,0 point"
+msgstr ""
+
 #. MSG_SELFTEST_BEDHEATER c=20
 #: ../../Firmware/ultralcd.cpp:6596
 msgid "Bed/Heater"

@@ -15,7 +15,11 @@ const char MSG_BABYSTEP_Z_NOT_SET[] PROGMEM_I1 = ISTR("Distance between tip of t
 const char MSG_BED[] PROGMEM_I1 = ISTR("Bed"); ////MSG_BED c=13
 const char MSG_BED_DONE[] PROGMEM_I1 = ISTR("Bed done"); ////MSG_BED_DONE c=20
 const char MSG_BED_HEATING[] PROGMEM_I1 = ISTR("Bed Heating"); ////MSG_BED_HEATING c=20
+const char MSG_BED_LEVELING_PICKING_UP_CLICKY[] PROGMEM_I1 = ISTR("Picking up Clicky"); ////MSG_BED_LEVELING_PICKING_UP_CLICKY c=20 r=2?
+const char MSG_BED_LEVELING_DROPPING_OFF_CLICKY[] PROGMEM_I1 = ISTR("Dropping off Clicky"); ////MSG_BED_LEVELING_DROPPING_OFF_CLICKY c=20 r=2?
 const char MSG_BED_LEVELING_FAILED_POINT_LOW[] PROGMEM_I1 = ISTR("Bed leveling failed. Sensor didn't trigger. Debris on nozzle? Waiting for reset."); ////MSG_BED_LEVELING_FAILED_POINT_LOW c=20 r=6
+const char MSG_BED_LEVELING_FAILED_CLICKY_PIN_NOT_FOIND[] PROGMEM_I1 = ISTR("Bed leveling failed. Coulnt pick up Clicky pin."); ////MSG_BED_LEVELING_FAILED_CLICKY_PIN_NOT_FOIND c=20 r2?
+const char MSG_BED_LEVELING_FAILED_CANT_DEPOSIT_CLICKY_PIN[] PROGMEM_I1 = ISTR("Bed leveling failed. Couldnt drop off Clicky pin"); ////MSG_BED_LEVELING_FAILED_CANT_DEPOSIT_CLICKY_PIN c=20 r=3?
 const char MSG_BED_SKEW_OFFSET_DETECTION_FITTING_FAILED[] PROGMEM_I1 = ISTR("XYZ calibration failed. Please consult the manual."); ////MSG_BED_SKEW_OFFSET_DETECTION_FITTING_FAILED c=20 r=8
 const char MSG_BELT_STATUS[] PROGMEM_I1 = ISTR("Belt status");////MSG_BELT_STATUS c=18
 const char MSG_CANCEL[] PROGMEM_I1 = ISTR(">Cancel");////MSG_CANCEL c=10
@@ -202,6 +206,7 @@ const char MSG_SPOOL_JOIN[] PROGMEM_N1 = "SpoolJoin"; ////MSG_SPOOL_JOIN c=13
 const char MSG_FIRMWARE[] PROGMEM_N1 = "Firmware"; ////MSG_FIRMWARE c=8
 const char MSG_TOSHIBA_FLASH_AIR_COMPATIBILITY[] PROGMEM_N1 = "FlashAir"; ////MSG_TOSHIBA_FLASH_AIR_COMPATIBILITY c=8
 const char MSG_PINDA[] PROGMEM_N1 = "PINDA"; ////MSG_PINDA c=5
+const char MSG_CLICKY[] PROGMEM_N1 = "CLICKY"; //MSG_CLICKY c=6
 const char MSG_WELCOME[] PROGMEM_N1 = WELCOME_MSG;
 const char MSG_SD_WORKDIR_FAIL[] PROGMEM_N1 = "workDir open failed"; ////
 const char MSG_BROWNOUT_RESET[] PROGMEM_N1 = " Brown out Reset"; ////

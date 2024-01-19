@@ -98,6 +98,16 @@ static_assert(TMC2130_MINIMUM_DELAY 1, // this will fail to compile when non-emp
 
 #endif //TMC2130_DEDGE_STEPPING
 
+#ifdef CLICKY_BED_PROBE
+#ifdef CLICKY_IGNORE_PICKUP_DROPOFF //Z checks that require pinda will accept clicky input in clicky-debug mode
+#define Z_MIN_CHECK (!use_clicky && (READ(Z_MIN_PIN) != Z_MIN_ENDSTOP_INVERTING)) || ((READ(Z_CLICKY_PIN) != Z_MIN_CLICKY_INVERTING))
+#else //CLICKY_IGNORE_PICKUP_DROPOFF
+#define Z_MIN_CHECK (!use_clicky && (READ(Z_MIN_PIN) != Z_MIN_ENDSTOP_INVERTING)) || (use_clicky && (READ(Z_CLICKY_PIN) != Z_MIN_CLICKY_INVERTING))
+#endif //CLICKY_IGNORE_PICKUP_DROPOFF
+#else //CLICKY_BED_PROBE
+#define Z_MIN_CHECK (READ(Z_MIN_PIN) != Z_MIN_ENDSTOP_INVERTING)
+#endif //CLICKY_BED_PROBE
+
 
 //===========================================================================
 //=============================public variables  ============================
@@ -137,6 +147,9 @@ static uint8_t endstop = 0;
 static uint8_t old_endstop = 0;
 
 static bool check_endstops = true;
+#ifdef CLICKY_BED_PROBE
+static bool use_clicky = false;
+#endif //CLICKY_BED_PROBE
 
 static bool check_z_endstop = false;
 static bool z_endstop_invert = false;
@@ -248,6 +261,15 @@ void invert_z_endstop(bool endstop_invert)
 {
   z_endstop_invert = endstop_invert;
 }
+
+#ifdef CLICKY_BED_PROBE
+bool enable_clicky_zprobe(bool _use_clicky)
+{
+  bool old = use_clicky;
+  use_clicky = _use_clicky;
+  return old;
+}
+#endif //CLICKY_BED_PROBE
 
 //         __________________________
 //        /|                        |\     _________________         ^
@@ -559,12 +581,12 @@ FORCE_INLINE void stepper_check_endstops()
           // Stall guard homing turned on
 #ifdef TMC2130_STEALTH_Z
           if ((tmc2130_mode == TMC2130_MODE_SILENT) && !(tmc2130_sg_homing_axes_mask & 0x04))
-            SET_BIT_TO(_endstop, Z_AXIS, (READ(Z_MIN_PIN) != Z_MIN_ENDSTOP_INVERTING));
+            SET_BIT_TO(_endstop, Z_AXIS, Z_MIN_CHECK);
           else
 #endif //TMC2130_STEALTH_Z
-            SET_BIT_TO(_endstop, Z_AXIS, (READ(Z_MIN_PIN) != Z_MIN_ENDSTOP_INVERTING) || (!READ(Z_TMC2130_DIAG)));
+            SET_BIT_TO(_endstop, Z_AXIS, Z_MIN_CHECK || (!READ(Z_TMC2130_DIAG)));
         #else
-          SET_BIT_TO(_endstop, Z_AXIS, (READ(Z_MIN_PIN) != Z_MIN_ENDSTOP_INVERTING));
+          SET_BIT_TO(_endstop, Z_AXIS, Z_MIN_CHECK);
         #endif //TMC2130_SG_HOMING
         if((_endstop & _old_endstop & _BV(Z_AXIS)) && (current_block->steps[Z_AXIS].wide > 0)) {
 #ifdef VERBOSE_CHECK_HIT_ENDSTOPS
@@ -613,13 +635,13 @@ FORCE_INLINE void stepper_check_endstops()
       #ifdef TMC2130_SG_HOMING
       // Stall guard homing turned on
 #ifdef TMC2130_STEALTH_Z
-      if ((tmc2130_mode == TMC2130_MODE_SILENT) && !(tmc2130_sg_homing_axes_mask & 0x04))
-        SET_BIT_TO(_endstop, Z_AXIS, (READ(Z_MIN_PIN) != Z_MIN_ENDSTOP_INVERTING));
-      else
+          if ((tmc2130_mode == TMC2130_MODE_SILENT) && !(tmc2130_sg_homing_axes_mask & 0x04))
+            SET_BIT_TO(_endstop, Z_AXIS, Z_MIN_CHECK);
+          else
 #endif //TMC2130_STEALTH_Z
-        SET_BIT_TO(_endstop, Z_AXIS, (READ(Z_MIN_PIN) != Z_MIN_ENDSTOP_INVERTING) || (!READ(Z_TMC2130_DIAG)));
-      #else
-      SET_BIT_TO(_endstop, Z_AXIS, (READ(Z_MIN_PIN) != Z_MIN_ENDSTOP_INVERTING));
+            SET_BIT_TO(_endstop, Z_AXIS, Z_MIN_CHECK || (!READ(Z_TMC2130_DIAG)));
+        #else
+          SET_BIT_TO(_endstop, Z_AXIS, Z_MIN_CHECK);
       #endif //TMC2130_SG_HOMING
       if(_endstop & _old_endstop & _BV(Z_AXIS)) {
 #ifdef VERBOSE_CHECK_HIT_ENDSTOPS
