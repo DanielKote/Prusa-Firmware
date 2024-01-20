@@ -35,8 +35,13 @@ float clicky_dock_z = 0; //last pickup's z for when the dock was located (used f
 #define CLICKY_PIN_LENGTH 10
 #endif
 
+#ifdef CLICKY_BED_PROBE
 #define Z_SEARCH_FEEDRATE (homing_feedrate[Z_AXIS] / (16 * 60))
 #define Z_LIFT_FEEDRATE (homing_feedrate[Z_AXIS] / (30))
+#else //CLICKY_BED_PROBE
+#define Z_SEARCH_FEEDRATE (homing_feedrate[Z_AXIS] / (4 * 60))
+#define Z_LIFT_FEEDRATE (homing_feedrate[Z_AXIS] / (60))
+#endif //CLICKY_BED_PROBE
 
 // Scaling of the real machine axes against the programmed dimensions in the firmware.
 // The correction is tiny, here around 0.5mm on 250mm length.
