@@ -460,8 +460,8 @@
 // Maximum bed level correction value
 #define BED_ADJUSTMENT_UM_MAX 100
 
-#define MESH_HOME_Z_CALIB 0.2
-#define MESH_HOME_Z_SEARCH 5.0f           // Z lift for homing, mesh bed leveling etc.
+//#define MESH_HOME_Z_CALIB 0.2
+#define MESH_HOME_Z_SEARCH 3.0f           // Z lift for homing, mesh bed leveling etc.
 
 #define X_PROBE_OFFSET_FROM_EXTRUDER 23     // Z probe (PINDA) to nozzle X offset: -left  +right
 #define Y_PROBE_OFFSET_FROM_EXTRUDER 4     // Z probe (PINDA) to nozzle Y offset: -front +behind (cad models show 4mm instead of 5?)
@@ -470,11 +470,9 @@
 #ifdef CLICKY_BED_PROBE //probe is designed to be 5.5mm right and 9mm behind the PINDA probe position
 #define MBL_X_PROBE_OFFSET_FROM_EXTRUDER (X_PROBE_OFFSET_FROM_EXTRUDER + 5.5)
 #define MBL_Y_PROBE_OFFSET_FROM_EXTRUDER (Y_PROBE_OFFSET_FROM_EXTRUDER - 9)
-#define MBL_Z_PROBE_OFFSET_FROM_EXTRUDER (Z_PROBE_OFFSET_FROM_EXTRUDER)
 #else //CLICKY_BED_PROBE
 #define MBL_X_PROBE_OFFSET_FROM_EXTRUDER (X_PROBE_OFFSET_FROM_EXTRUDER)
 #define MBL_Y_PROBE_OFFSET_FROM_EXTRUDER (Y_PROBE_OFFSET_FROM_EXTRUDER)
-#define MBL_Z_PROBE_OFFSET_FROM_EXTRUDER (Z_PROBE_OFFSET_FROM_EXTRUDER)
 #endif //CLICKY_BED_PROBE
 
 #endif //MESH_BED_LEVELING

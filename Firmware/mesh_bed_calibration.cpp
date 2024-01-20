@@ -31,7 +31,7 @@ float clicky_dock_z = 0; //last pickup's z for when the dock was located (used f
 
 #ifdef CLICKY_BED_PROBE
 #define CLICKY_PICKUP_Z 5
-#define CLICKY_PICKUP_X X_MAX_POS - 1
+#define CLICKY_DOCK_X X_MAX_POS - 1
 #define CLICKY_PIN_LENGTH 10
 #endif
 
@@ -2878,10 +2878,10 @@ bool pick_up_clicky()
         //pick up the clicky pin from its holder (rightmost x position)
         current_position[Z_AXIS] = CLICKY_PICKUP_Z;
         go_to_current(homing_feedrate[Z_AXIS]/60);
-        current_position[X_AXIS] = CLICKY_PICKUP_X;
+        current_position[X_AXIS] = CLICKY_DOCK_X;
         go_to_current(homing_feedrate[X_AXIS]/15);
 
-        if(!find_bed_clicky_sensor_point_z(-2, 1))
+        if(!find_bed_clicky_sensor_point_z(-1, 1))
         {
             kill(_T(MSG_BED_LEVELING_FAILED_CLICKY_PIN_NOT_FOIND));
             return false;
@@ -2893,11 +2893,13 @@ bool pick_up_clicky()
         current_position[X_AXIS] -= 20 + X_PROBE_OFFSET_FROM_EXTRUDER;
         go_to_current(homing_feedrate[X_AXIS]/15);
 
-        if(!find_bed_clicky_sensor_point_z(-2, 1))
+        if(!find_bed_clicky_sensor_point_z(-1, 1))
         {
             lift_z_then_kill(_T(MSG_BED_LEVELING_FAILED_CLICKY_PIN_NOT_FOIND));
             return false;
         }
+        current_position[Z_AXIS] += 1.5;
+        go_to_current(homing_feedrate[Z_AXIS]/30);
     }
     clicky_attached = true;
 #endif //CLICKY_IGNORE_PICKUP_DROPOFF
@@ -2913,7 +2915,7 @@ bool drop_off_clicky(float expected_z)
         //deposit clicky pin back to its holder
         current_position[Z_AXIS] = clicky_dock_z + CLICKY_PIN_LENGTH;
         go_to_current(homing_feedrate[Z_AXIS]/60);
-        current_position[X_AXIS] = CLICKY_PICKUP_X;
+        current_position[X_AXIS] = CLICKY_DOCK_X;
         current_position[Y_AXIS] = 0;
         go_to_current(homing_feedrate[X_AXIS]/15);
         current_position[Z_AXIS] = clicky_dock_z;
@@ -2946,6 +2948,10 @@ bool sample_mesh_and_store_reference()
 {
     bool endstops_enabled  = enable_endstops(false);
     bool endstop_z_enabled = enable_z_endstop(false);
+
+#ifdef CLICKY_BED_PROBE
+    float clicky_z_offset = 0.0f;
+#endif // CLICKY_BED_PROBE
 
     // Don't let the manage_inactivity() function remove power from the motors.
     refresh_cmd_timeout();
@@ -2993,6 +2999,8 @@ bool sample_mesh_and_store_reference()
 #endif //MESH_BED_CALIBRATION_SHOW_LCD
     st_synchronize();
     if(!pick_up_clicky()) return false;
+    st_synchronize();
+    clicky_z_offset = current_position[Z_AXIS];
 #ifdef MESH_BED_CALIBRATION_SHOW_LCD
     lcd_display_message_fullscreen_P(_T(MSG_MEASURE_BED_REFERENCE_HEIGHT_LINE1));
 #endif //MESH_BED_CALIBRATION_SHOW_LCD
@@ -3017,7 +3025,10 @@ bool sample_mesh_and_store_reference()
         refresh_cmd_timeout();
         // Print the decrasing ID of the measurement point.
         current_position[Z_AXIS] = MESH_HOME_Z_SEARCH;
-        go_to_current(homing_feedrate[Z_AXIS]/60);
+#ifdef CLICKY_BED_PROBE
+        current_position[Z_AXIS] += clicky_z_offset;
+#endif //CLICKY_BED_PROBE
+        go_to_current(Z_LIFT_FEEDRATE);
 		uint8_t ix = mesh_point % MESH_MEAS_NUM_X_POINTS;
 		uint8_t iy = mesh_point / MESH_MEAS_NUM_X_POINTS;
 		if (iy & 1) ix = (MESH_MEAS_NUM_X_POINTS - 1) - ix; // Zig zag
@@ -3031,7 +3042,7 @@ bool sample_mesh_and_store_reference()
         lcd_printf_P(PSTR("%d/9"),mesh_point+1);
 #endif /* MESH_BED_CALIBRATION_SHOW_LCD */
 #ifdef CLICKY_BED_PROBE
-		if (!find_bed_clicky_sensor_point_z()) //Z crash or deviation > 50um
+		if (!find_bed_clicky_sensor_point_z(-1)) //Z crash or deviation > 50um
 #else //CLICKY_BED_PROBE
         if (!find_bed_induction_sensor_point_z()) //Z crash or deviation > 50um
 #endif //CLICKY_BED_PROBE
@@ -3067,6 +3078,18 @@ bool sample_mesh_and_store_reference()
             SERIAL_PROTOCOLLNPGM("Exreme span of the Z values!");
             return false;
         }
+    }
+
+    //Print out the bed measurements data for dev purposes
+    SERIAL_ECHOPGM("\nBED Z-JITTER DATA\n");
+    for(int_least8_t i = 0; i < 3; i++)
+    {
+        for(int_least8_t j=0; j<3; j++)
+        {
+            SERIAL_ECHO((int)((mbl.z_values[i][j] - mbl.z_values[0][0]) * 1000));
+            SERIAL_ECHOPGM(",");
+        }
+        SERIAL_ECHOPGM("\n");
     }
 
     // Store the correction values to EEPROM.

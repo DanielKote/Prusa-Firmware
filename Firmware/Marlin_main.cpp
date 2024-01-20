@@ -156,14 +156,6 @@ CardReader card;
 
 float default_retraction = DEFAULT_RETRACTION;
 
-
-//redefine bed finding for the use of clicky if enabled (if induction sensing is specifically required, it is left as default find_bed_induction_sensor_point_z)
-#ifdef CLICKY_BED_PROBE
-#define FIND_BED_Z(c,d) find_bed_clicky_sensor_point_z(c,d)
-#else
-#define FIND_BED_Z(c,d) find_bed_induction_sensor_point_z(c,d)
-#endif
-
 //Although this flag and many others like this could be represented with a struct/bitfield for each axis (more readable and efficient code), the implementation
 //would not be standard across all platforms. That being said, the code will continue to use bitmasks for independent axis.
 //Moreover, according to C/C++ standard, the ordering of bits is platform/compiler dependent and the compiler is allowed to align the bits arbitrarily,
@@ -2801,12 +2793,13 @@ static void gcode_G28(bool home_x_axis, bool home_y_axis, bool home_z_axis)
 static void gcode_G80()
 {
     constexpr float XY_AXIS_FEEDRATE = (homing_feedrate[X_AXIS] * 3) / 60;
-    constexpr float Z_CALIBRATION_THRESHOLD = 0.35f;
 #ifdef CLICKY_BED_PROBE
     constexpr float Z_LIFT_FEEDRATE = homing_feedrate[Z_AXIS] / 30;
+    constexpr float Z_CALIBRATION_THRESHOLD = 0.5f;
     constexpr float MESH_HOME_Z_SEARCH_FAST = 1.00f; //physical probe needs to move up higher to ensure it doesnt collide with bed during move operations
 #else
     constexpr float Z_LIFT_FEEDRATE = homing_feedrate[Z_AXIS] / 60;
+    constexpr float Z_CALIBRATION_THRESHOLD = 0.35f;
     constexpr float MESH_HOME_Z_SEARCH_FAST = 0.35f;
 #endif
     st_synchronize();
@@ -2864,7 +2857,7 @@ static void gcode_G80()
     if(!pick_up_clicky()) return;
 
     //measure 0,0 point with clicky to ensure loaded y-offset data is properly offset by 0,0
-    current_position[Z_AXIS] = MESH_HOME_Z_SEARCH;
+    current_position[Z_AXIS] += MESH_HOME_Z_SEARCH;
     plan_buffer_line_curposXYZE(Z_LIFT_FEEDRATE);
     st_synchronize();
 
@@ -2873,11 +2866,12 @@ static void gcode_G80()
     world2machine_clamp(current_position[X_AXIS], current_position[Y_AXIS]);
     plan_buffer_line_curposXYZE(XY_AXIS_FEEDRATE);
     st_synchronize();
-    if (!FIND_BED_Z( -2.0f, 3)) {
+    if (!find_bed_clicky_sensor_point_z( -1.0f, nProbeRetryCount)) {
         kill(_i("Mesh bed leveling failed. Cant find 0,0 point")); ////MSG_MBL_ZZ_FAIL c=20 r=2?
     }
     st_synchronize();
     mbl.set_z(0,0, current_position[Z_AXIS]);
+    const float clicky_z_offset = current_position[Z_AXIS];
 #endif //CLICKY_BED_PROBE
 
     // Initialize the default mesh from eeprom and calculate how many points are to be probed
@@ -2923,7 +2917,11 @@ static void gcode_G80()
     lcd_update(1);
 
     // Lift Z to a safe position before probing the first point
-    current_position[Z_AXIS] = MESH_HOME_Z_SEARCH;
+    current_position[Z_AXIS] = MESH_HOME_Z_SEARCH
+#ifdef CLICKY_BED_PROBE
+        + clicky_z_offset;
+#endif //CLICKY_BED_PROBE
+        ;
     plan_buffer_line_curposXYZE(Z_LIFT_FEEDRATE);
 
     // Cycle through all points and probe them
@@ -2957,7 +2955,12 @@ static void gcode_G80()
 
         // Move Z up to the probe height of the current Z point.
         const float z0 = mbl.z_values[iy][ix];
-        const float init_z_bckp = !has_z ? MESH_HOME_Z_SEARCH : z0 + MESH_HOME_Z_SEARCH_FAST;
+        const float init_z_bckp = !has_z ? 
+#ifdef CLICKY_BED_PROBE
+            clicky_z_offset +
+#endif 
+            MESH_HOME_Z_SEARCH : z0 + MESH_HOME_Z_SEARCH_FAST;
+
         if (init_z_bckp > current_position[Z_AXIS]) {
             current_position[Z_AXIS] = init_z_bckp;
             plan_buffer_line_curposXYZE(Z_LIFT_FEEDRATE);
@@ -2980,18 +2983,27 @@ static void gcode_G80()
         }
 
         // Go down until endstop is hit
-        if (!FIND_BED_Z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : -10.f, nProbeRetryCount)) { //if we have data from z calibration max allowed difference is 1mm for each point, if we dont have data max difference is 10mm from initial point
+#ifdef CLICKY_BED_PROBE
+        if (!find_bed_clicky_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : 0.0f, nProbeRetryCount)) { //if we have data from z calibration max allowed difference is 1mm for each point, if we dont have data max difference is 10mm from initial point
+#else //CLICKY_BED_PROBE
+        if (!find_bed_induction_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : -10.f, nProbeRetryCount)) { //if we have data from z calibration max allowed difference is 1mm for each point, if we dont have data max difference is 10mm from initial point
+#endif //CLICKY_BED_PROBE
             printf_P(_T(MSG_BED_LEVELING_FAILED_POINT_LOW));
+            printf_P(PSTR("\nFAILURE!!!! probe point %d, %d : expected: %.3f, actual: %.3f, difference: %.3f\n"), ix, iy, z0, current_position[Z_AXIS], z0 - current_position[Z_AXIS]);
             break;
         }
+        //printf_P(PSTR("probe point %d, %d : expected: %.3f, actual: %.3f, difference: %.3f"), ix, iy, z0, current_position[Z_AXIS], z0 - current_position[Z_AXIS]);
         if (init_z_bckp - current_position[Z_AXIS] < 0.f) { //broken cable or initial Z coordinate too low. Go to MESH_HOME_Z_SEARCH and repeat last step (z-probe) again to distinguish between these two cases.
             current_position[Z_AXIS] = MESH_HOME_Z_SEARCH;
             plan_buffer_line_curposXYZE(Z_LIFT_FEEDRATE);
             st_synchronize();
 
-            if (!FIND_BED_Z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : -10.f, nProbeRetryCount)) { //if we have data from z calibration max allowed difference is 1mm for each point, if we dont have data max difference is 10mm from initial point
-                printf_P(_T(MSG_BED_LEVELING_FAILED_POINT_LOW));
-                break;
+#ifdef CLICKY_BED_PROBE
+            if (!find_bed_clicky_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : 0.0f, nProbeRetryCount)) { //if we have data from z calibration max allowed difference is 1mm for each point, if we dont have data max difference is 10mm from initial point
+#else //CLICKY_BED_PROBE
+            if (!find_bed_induction_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : -10.f, nProbeRetryCount)) { //if we have data from z calibration max allowed difference is 1mm for each point, if we dont have data max difference is 10mm from initial point
+#endif //CLICKY_BED_PROBE                printf_P(_T(MSG_BED_LEVELING_FAILED_POINT_LOW));
+               break;
             }
             if (MESH_HOME_Z_SEARCH - current_position[Z_AXIS] < 0.1f) {
                 puts_P(PSTR("Bed leveling failed. Sensor triggered too soon"));
@@ -3014,8 +3026,6 @@ static void gcode_G80()
         mesh_point++;
         lcd_update(1);
     }
-    current_position[Z_AXIS] = MESH_HOME_Z_SEARCH;
-    plan_buffer_line_curposXYZE(Z_LIFT_FEEDRATE);
 
 #ifdef CLICKY_BED_PROBE
     st_synchronize();
@@ -3023,7 +3033,10 @@ static void gcode_G80()
     custom_message_type = CustomMsg::Status;
     lcd_update(1);
     if(!drop_off_clicky(mbl.z_values[0][MESH_NUM_X_POINTS - 1])) return;
-#endif
+#else //CLICKY_BED_PROBE
+    current_position[Z_AXIS] = MESH_HOME_Z_SEARCH;
+    plan_buffer_line_curposXYZE(Z_LIFT_FEEDRATE);
+#endif //CLICKY_BED_PROBE
 
     st_synchronize();
     static uint8_t g80_fail_cnt = 0;
@@ -4703,7 +4716,18 @@ void process_commands()
         {
 
 #ifdef CLICKY_BED_PROBE
+            float XY_AXIS_FEEDRATE = (homing_feedrate[X_AXIS] * 3) / 60;
+            float Z_LIFT_FEEDRATE = homing_feedrate[Z_AXIS] / 60;
+            float old_xyz[3] = {current_position[0], current_position[1], current_position[3]};
+            
             pick_up_clicky();
+            st_synchronize();
+            current_position[Z_AXIS] += 3;
+            plan_buffer_line_curposXYZE(Z_LIFT_FEEDRATE);
+
+            for(int_least8_t i = 0; i < 3; i++) current_position[i] = old_xyz[i];
+            world2machine_clamp(current_position[X_AXIS], current_position[Y_AXIS]);
+            plan_buffer_line_curposXYZE(XY_AXIS_FEEDRATE);
 #endif //CLICKY_BED_PROBE
             st_synchronize();
             homing_flag = true;
@@ -4713,7 +4737,11 @@ void process_commands()
 
             feedrate = homing_feedrate[Z_AXIS];
 
-            FIND_BED_Z(-10.f, 3);
+#ifdef CLICKY_BED_PROBE
+            find_bed_clicky_sensor_point_z(0.0f, 3);
+#else //CLICKY_BED_PROBE
+            find_bed_induction_sensor_point_z(-10.0f, 3);
+#endif //CLICKY_BED_PROBE
 
 			printf_P(_N("%S X: %.5f Y: %.5f Z: %.5f\n"), _T(MSG_BED), _x, _y, _z);
 
@@ -4721,6 +4749,9 @@ void process_commands()
             if(!code_seen('K'))
             {
                 drop_off_clicky(mbl.active? mbl.z_values[0][MESH_NUM_X_POINTS-1] : -2);
+                for(int_least8_t i = 0; i < 3; i++) current_position[i] = old_xyz[i];
+                world2machine_clamp(current_position[X_AXIS], current_position[Y_AXIS]);
+                plan_buffer_line_curposXYZE(XY_AXIS_FEEDRATE);
             }
 #endif //CLICKY_BED_PROBE
             clean_up_after_endstop_move(l_feedmultiply);
