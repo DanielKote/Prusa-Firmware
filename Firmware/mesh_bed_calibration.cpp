@@ -35,6 +35,9 @@ float clicky_dock_z = 0; //last pickup's z for when the dock was located (used f
 #define CLICKY_PIN_LENGTH 10
 #endif
 
+#define Z_SEARCH_FEEDRATE (homing_feedrate[Z_AXIS] / (16 * 60))
+#define Z_LIFT_FEEDRATE (homing_feedrate[Z_AXIS] / (30))
+
 // Scaling of the real machine axes against the programmed dimensions in the firmware.
 // The correction is tiny, here around 0.5mm on 250mm length.
 //#define MACHINE_AXIS_SCALE_X ((250.f - 0.5f) / 250.f)
@@ -1002,11 +1005,11 @@ bool find_bed_induction_sensor_point_z(float minimum_z, uint8_t n_iter, int
         
 		current_position[Z_AXIS] += high_deviation_occured ? 0.5 : 0.2;
 		float z_bckp = current_position[Z_AXIS];
-		go_to_current(homing_feedrate[Z_AXIS]/60);
+		go_to_current(Z_LIFT_FEEDRATE);
 		// Move back down slowly to find bed.
         current_position[Z_AXIS] = minimum_z;
 		//printf_P(PSTR("init Z = %f, min_z = %f, i = %d\n"), z_bckp, minimum_z, i);
-        go_to_current(homing_feedrate[Z_AXIS]/(16*60));
+        go_to_current(Z_SEARCH_FEEDRATE);
         // we have to let the planner know where we are right now as it is not where we said to go.
         update_current_position_z();
 		//printf_P(PSTR("Zs: %f, Z: %f, delta Z: %f"), z_bckp, current_position[Z_AXIS], (z_bckp - current_position[Z_AXIS]));
@@ -1014,7 +1017,7 @@ bool find_bed_induction_sensor_point_z(float minimum_z, uint8_t n_iter, int
 			//printf_P(PSTR("PINDA triggered immediately, move Z higher and repeat measurement\n")); 
 			raise_z(0.5);
 			current_position[Z_AXIS] = minimum_z;
-            go_to_current(homing_feedrate[Z_AXIS]/(16*60));
+            go_to_current(Z_SEARCH_FEEDRATE);
             // we have to let the planner know where we are right now as it is not where we said to go.
 			update_current_position_z();
 		}
