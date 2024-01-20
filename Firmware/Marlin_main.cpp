@@ -2801,11 +2801,12 @@ static void gcode_G28(bool home_x_axis, bool home_y_axis, bool home_z_axis)
 static void gcode_G80()
 {
     constexpr float XY_AXIS_FEEDRATE = (homing_feedrate[X_AXIS] * 3) / 60;
-    constexpr float Z_LIFT_FEEDRATE = homing_feedrate[Z_AXIS] / 60;
     constexpr float Z_CALIBRATION_THRESHOLD = 0.35f;
 #ifdef CLICKY_BED_PROBE
+    constexpr float Z_LIFT_FEEDRATE = homing_feedrate[Z_AXIS] / 30;
     constexpr float MESH_HOME_Z_SEARCH_FAST = 1.00f; //physical probe needs to move up higher to ensure it doesnt collide with bed during move operations
 #else
+    constexpr float Z_LIFT_FEEDRATE = homing_feedrate[Z_AXIS] / 60;
     constexpr float MESH_HOME_Z_SEARCH_FAST = 0.35f;
 #endif
     st_synchronize();
