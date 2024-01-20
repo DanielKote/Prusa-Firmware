@@ -467,12 +467,14 @@
 #define Y_PROBE_OFFSET_FROM_EXTRUDER 4     // Z probe (PINDA) to nozzle Y offset: -front +behind (cad models show 4mm instead of 5?)
 #define Z_PROBE_OFFSET_FROM_EXTRUDER -0.4  // Z probe (PINDA) to nozzle Z offset: -below (always!)
 
-#ifdef CLICKY_BED_PROBE //probe is designed to be 5.5mm right and 9mm behind the PINDA probe position
+#ifdef CLICKY_BED_PROBE //probe is designed to be 5.5mm right and 9mm behind the PINDA probe position.
 #define MBL_X_PROBE_OFFSET_FROM_EXTRUDER (X_PROBE_OFFSET_FROM_EXTRUDER + 5.5)
 #define MBL_Y_PROBE_OFFSET_FROM_EXTRUDER (Y_PROBE_OFFSET_FROM_EXTRUDER - 9)
+#define MBL_Z_PROBE_OFFSET_FROM_EXTRUDER -1 //Z offset is used as an extra 'plus' for MBL so as to decrease the z-live offset that needs to be set. WARNING! still has to be small enough (closer to 0) that the z-live is -ve!
 #else //CLICKY_BED_PROBE
 #define MBL_X_PROBE_OFFSET_FROM_EXTRUDER (X_PROBE_OFFSET_FROM_EXTRUDER)
 #define MBL_Y_PROBE_OFFSET_FROM_EXTRUDER (Y_PROBE_OFFSET_FROM_EXTRUDER)
+#define MBL_Z_PROBE_OFFSET_FROM_EXTRUDER (Z_PROBE_OFFSET_FROM_EXTRUDER)
 #endif //CLICKY_BED_PROBE
 
 #endif //MESH_BED_LEVELING

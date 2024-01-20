@@ -3128,8 +3128,14 @@ static void gcode_G80()
     if (nMeasPoints == 7 && useMagnetCompensation) {
         mbl_magnet_elimination();
     }
+#else //CLICKY_BED_PROBE
+    //apply probe z-offset to decrease z-live calibration to bearable amounts in case of clicky probe (otherwise z-live could be in the -2mm+ range)
+      for (uint8_t row = 0; row < MESH_NUM_Y_POINTS; row++) {
+        for (uint8_t col = 0; col < MESH_NUM_X_POINTS; col++) {
+            mbl.z_values[row][col] += MBL_Z_PROBE_OFFSET_FROM_EXTRUDER;
+        }
+      }  
 #endif //CLICKY_BED_PROBE
-
     mbl.active = 1; //activate mesh bed leveling
     ///*
     //Print out the bed measurements data for dev purposes
