@@ -6283,7 +6283,11 @@ static bool lcd_selfcheck_axis_sg(uint8_t axis) {
 	enable_endstops(true);
 
 
+#ifdef CLICKY_BED_PROBE
+	raise_z_above(MESH_HOME_Z_SEARCH + 10); //a bit more clearance for clicky
+#else //CLICKY_BED_PROBE
 	raise_z_above(MESH_HOME_Z_SEARCH);
+#endif //CLICKY_BED_PROBE
 	tmc2130_home_enter(1 << axis);
 
 // first axis length measurement begin
