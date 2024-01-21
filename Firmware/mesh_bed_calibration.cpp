@@ -36,8 +36,8 @@ float clicky_dock_z = 0; //last pickup's z for when the dock was located (used f
 #endif
 
 #ifdef CLICKY_BED_PROBE
-#define Z_SEARCH_FEEDRATE (homing_feedrate[Z_AXIS] / (16 * 60))
-#define Z_LIFT_FEEDRATE (homing_feedrate[Z_AXIS] / (30))
+#define Z_SEARCH_FEEDRATE (homing_feedrate[Z_AXIS] / (4 * 60))
+#define Z_LIFT_FEEDRATE (homing_feedrate[Z_AXIS] / (60))
 #else //CLICKY_BED_PROBE
 #define Z_SEARCH_FEEDRATE (homing_feedrate[Z_AXIS] / (4 * 60))
 #define Z_LIFT_FEEDRATE (homing_feedrate[Z_AXIS] / (60))
