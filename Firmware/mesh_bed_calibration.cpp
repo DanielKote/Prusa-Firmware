@@ -30,9 +30,9 @@ float clicky_dock_z = 0; //last pickup's z for when the dock was located (used f
 #define WEIGHT_FIRST_ROW_Y_LOW  (0.0f)
 
 #ifdef CLICKY_BED_PROBE
-#define CLICKY_PICKUP_Z 5
-#define CLICKY_DOCK_X X_MAX_POS - 1
-#define CLICKY_PIN_LENGTH 10
+#define CLICKY_PICKUP_Z 5           //Z height (above the z=0 measured by pinda probe!) for picking up clicky (should have a 2-3mm gap between magnet and pin)
+#define CLICKY_DOCK_X X_MAX_POS - 0 //X position of dock (current design places it at max X position to allow for use of the full 250mm of bed)
+#define CLICKY_PIN_LENGTH 10        //Length of clicky pin - when pin is picked up the extruder moves up by this length to clear the dock
 #endif
 
 #ifdef CLICKY_BED_PROBE
@@ -955,8 +955,7 @@ static inline void update_current_position_z()
 }
 
 // At the current position, find the Z stop.
-
-bool find_bed_induction_sensor_point_z(float minimum_z, uint8_t n_iter, int
+bool find_z_sensor_point_z(float minimum_z, uint8_t n_iter, int
 #ifdef SUPPORT_VERBOSITY
     verbosity_level
 #endif //SUPPORT_VERBOSITY
@@ -986,6 +985,8 @@ bool find_bed_induction_sensor_point_z(float minimum_z, uint8_t n_iter, int
     bool clicky_enabled = enable_clicky_zprobe(use_clicky);
 #endif
     float z = 0.f;
+    float z_avg_deviation = 0.0f;
+    float z_max_deviation = 0.0f;
     endstop_z_hit_on_purpose();
 
     // move down until you find the bed
@@ -1045,6 +1046,8 @@ bool find_bed_induction_sensor_point_z(float minimum_z, uint8_t n_iter, int
         //        SERIAL_ECHOLNPGM("");
 		float dz = i?fabs(current_position[Z_AXIS] - (z / i)):0;
         z += current_position[Z_AXIS];
+        z_avg_deviation += dz;
+        if(dz > z_max_deviation) z_max_deviation = dz;
 		//printf_P(PSTR("Z[%d] = %d, dz=%d\n"), i, (int)(current_position[Z_AXIS] * 1000), (int)(dz * 1000));
 		//printf_P(PSTR("Z- measurement deviation from avg value %f um\n"), dz);
 		if (dz > 0.05) { //deviation > 50um
@@ -1064,8 +1067,12 @@ bool find_bed_induction_sensor_point_z(float minimum_z, uint8_t n_iter, int
     }
     current_position[Z_AXIS] = z;
     if (n_iter > 1)
+    {
         current_position[Z_AXIS] /= float(n_iter);
+        z_avg_deviation /= float(n_iter);
+    }
 
+    printf_P(PSTR("%d samples; avg-deviation: %.3f, max-deviation: %.3f"), n_iter, z_avg_deviation, z_max_deviation);
 
     enable_endstops(endstops_enabled);
     enable_z_endstop(endstop_z_enabled);
@@ -2881,7 +2888,7 @@ bool pick_up_clicky()
         current_position[X_AXIS] = CLICKY_DOCK_X;
         go_to_current(homing_feedrate[X_AXIS]/15);
 
-        if(!find_bed_clicky_sensor_point_z(-1, 1))
+        if(!find_bed_clicky_sensor_point_z(-5, 1))
         {
             kill(_T(MSG_BED_LEVELING_FAILED_CLICKY_PIN_NOT_FOIND));
             return false;
@@ -2928,7 +2935,7 @@ bool drop_off_clicky(float expected_z)
         go_to_current(homing_feedrate[X_AXIS]/15);
 
         //try to find the bed, but not too hard - if we fail to find the bed that is good! that means that the clicky pin was depsoted correctly (if the bed is found, then that means pin is still on the probe... error!)
-        if(find_bed_clicky_sensor_point_z(expected_z - 0.5, 1))
+        if(find_bed_clicky_sensor_point_z(expected_z - 1, 1))
         {
             lift_z_then_kill(_T(MSG_BED_LEVELING_FAILED_CANT_DEPOSIT_CLICKY_PIN));
             return false;
