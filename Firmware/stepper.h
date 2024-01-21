@@ -66,6 +66,9 @@ bool endstop_z_hit_on_purpose();
 bool enable_endstops(bool check); // Enable/disable endstop checking. Return the old value.
 bool enable_z_endstop(bool check);
 void invert_z_endstop(bool endstop_invert);
+#ifdef CLICKY_BED_PROBE
+bool enable_clicky_zprobe(bool use_clicky); // Enable/disable clicky probe (if clicky is enabled, regular z-min (pinda) will be disabled)
+#endif
 
 void checkStepperErrors(); //Print errors detected by the stepper
 

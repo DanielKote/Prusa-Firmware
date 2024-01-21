@@ -85,9 +85,16 @@
 #define Z_MIN_PIN          -1
 #endif
 
+#ifdef CLICKY_BED_PROBE
+#define SENSITIVE_PINS {0, 1, X_STEP_PIN, X_DIR_PIN, X_ENABLE_PIN, X_MIN_PIN, X_MAX_PIN, Y_STEP_PIN, Y_DIR_PIN, Y_ENABLE_PIN, Y_MAX_PIN, Z_STEP_PIN, Z_DIR_PIN, Z_ENABLE_PIN, Z_MIN_PIN, Z_CLICKY_PIN, Z_MAX_PIN, PS_ON_PIN, \
+                        HEATER_BED_PIN, FAN_PIN,                  \
+                        _E0_PINS _E1_PINS _E2_PINS             \
+                        analogInputToDigitalPin(TEMP_0_PIN), analogInputToDigitalPin(TEMP_1_PIN), analogInputToDigitalPin(TEMP_2_PIN), analogInputToDigitalPin(TEMP_BED_PIN) }
+#else //CLICKY_BED_PROBE
 #define SENSITIVE_PINS {0, 1, X_STEP_PIN, X_DIR_PIN, X_ENABLE_PIN, X_MIN_PIN, X_MAX_PIN, Y_STEP_PIN, Y_DIR_PIN, Y_ENABLE_PIN, Y_MIN_PIN, Y_MAX_PIN, Z_STEP_PIN, Z_DIR_PIN, Z_ENABLE_PIN, Z_MIN_PIN, Z_MAX_PIN, PS_ON_PIN, \
                         HEATER_BED_PIN, FAN_PIN,                  \
                         _E0_PINS _E1_PINS _E2_PINS             \
                         analogInputToDigitalPin(TEMP_0_PIN), analogInputToDigitalPin(TEMP_1_PIN), analogInputToDigitalPin(TEMP_2_PIN), analogInputToDigitalPin(TEMP_BED_PIN) }
+#endif //CLICKY_BED_PROBE
 
 #endif //__PINS_H

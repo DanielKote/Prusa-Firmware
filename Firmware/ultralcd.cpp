@@ -3293,6 +3293,7 @@ static void lcd_print_state(uint8_t state)
 //! @code{.unparsed}
 //! |01234567890123456789|
 //! |PINDA N/A  FINDA N/A|  MSG_PINDA c=5 MSG_FINDA c=5
+//! |CLICKY           N/A|  MSG_CLICKY
 //! |Fil. sensor      N/A|  MSG_FSENSOR
 //! | Int: 000  Xd:+00000|
 //! |Shut: 000  Yd:+00000|
@@ -3303,23 +3304,35 @@ static void lcd_show_sensors_state()
 	//0: N/A; 1: OFF; 2: ON
 	uint8_t pinda_state = STATE_NA;
 	uint8_t idler_state = STATE_NA;
+    uint8_t y_counter = 0;
 
 	pinda_state = READ(Z_MIN_PIN);
-	lcd_puts_at_P(0, 0, MSG_PINDA);
-	lcd_set_cursor(LCD_WIDTH - 14, 0);
+	lcd_puts_at_P(0, y_counter, MSG_PINDA);
+	lcd_set_cursor(LCD_WIDTH - 14, y_counter);
 	lcd_print_state(pinda_state);
-
 	if (MMU2::mmu2.Enabled()) {
 		const uint8_t finda_state = MMU2::mmu2.FindaDetectsFilament();
 		lcd_puts_at_P(10, 0, _n("FINDA"));////MSG_FINDA c=5
 		lcd_set_cursor(LCD_WIDTH - 3, 0);
 		lcd_print_state(finda_state);
 	}
+    y_counter++;
+
+#ifdef CLICKY_BED_PROBE
+    uint8_t clicky_state = STATE_NA;
+    clicky_state = READ(Z_CLICKY_PIN);
+    lcd_puts_at_P(0, y_counter, MSG_CLICKY);
+    lcd_set_cursor(LCD_WIDTH - 14, y_counter);
+    lcd_print_state(clicky_state);
+    y_counter++;
+#endif
+
 #ifdef FILAMENT_SENSOR
 	idler_state = fsensor.getFilamentPresent();
-	lcd_puts_at_P(0, 1, _T(MSG_FSENSOR));
-	lcd_set_cursor(LCD_WIDTH - 3, 1);
+	lcd_puts_at_P(0, y_counter, _T(MSG_FSENSOR));
+	lcd_set_cursor(LCD_WIDTH - 3, y_counter);
 	lcd_print_state(idler_state);
+    y_counter++;
 #endif //FILAMENT_SENSOR
 
 #if defined(FILAMENT_SENSOR) && (FILAMENT_SENSOR_TYPE == FSENSOR_PAT9125)
@@ -3334,7 +3347,7 @@ static void lcd_show_sensors_state()
     //  The maximum value of the shutter is 17. The value of 16 seems to be reported as 17 even though the
     //  Brightness value changes correctly as if the shutter changed to 16 (probably some bug with the sensor).
     //  The shutter algorithm tries to keep the B value in the 70-110 range.
-    lcd_set_cursor(0, 2);
+    lcd_set_cursor(0, y_counter);
     lcd_printf_P(_N("B: %3d     Xd:%6d\n"
                     "S: %3d     Yd:%6d"),
                  pat9125_b, pat9125_x,
@@ -5534,11 +5547,13 @@ static void lcd_tune_menu()
 	MENU_END();
 }
 
+#ifndef CLICKY_BED_PROBE
 static void mbl_magnets_elimination_toggle() {
 	bool magnet_elimination = (eeprom_read_byte((uint8_t*)EEPROM_MBL_MAGNET_ELIMINATION) > 0);
 	magnet_elimination = !magnet_elimination;
 	eeprom_update_byte((uint8_t*)EEPROM_MBL_MAGNET_ELIMINATION, (uint8_t)magnet_elimination);
 }
+#endif //CLICKY_BED_PROBE
 
 static void mbl_mesh_toggle() {
 	uint8_t mesh_nr = eeprom_read_byte((uint8_t*)EEPROM_MBL_POINTS_NR);
@@ -5561,7 +5576,9 @@ static void mbl_probe_nr_toggle() {
 static void lcd_mesh_bed_leveling_settings()
 {
 
+#ifndef CLICKY_BED_PROBE
 	bool magnet_elimination = (eeprom_read_byte((uint8_t*)EEPROM_MBL_MAGNET_ELIMINATION) > 0);
+#endif //CLICKY_BED_PROBE
 	uint8_t points_nr = eeprom_read_byte((uint8_t*)EEPROM_MBL_POINTS_NR);
     uint8_t mbl_z_probe_nr = eeprom_read_byte((uint8_t*)EEPROM_MBL_PROBE_NR);
 	char sToggle[4]; //enough for nxn format
@@ -5576,7 +5593,9 @@ static void lcd_mesh_bed_leveling_settings()
 	sToggle[0] = mbl_z_probe_nr + '0';
 	sToggle[1] = 0;
 	MENU_ITEM_TOGGLE(_T(MSG_Z_PROBE_NR), sToggle, mbl_probe_nr_toggle);
+#ifndef CLICKY_BED_PROBE
 	MENU_ITEM_TOGGLE_P(_T(MSG_MAGNETS_COMP), (points_nr == 7) ? (magnet_elimination ? _T(MSG_ON): _T(MSG_OFF)) : _T(MSG_NA), mbl_magnets_elimination_toggle);
+#endif //CLICKY_BED_PROBE
 	MENU_END();
 }
 
@@ -6288,7 +6307,11 @@ static bool lcd_selfcheck_axis_sg(uint8_t axis) {
 	enable_endstops(true);
 
 
+#ifdef CLICKY_BED_PROBE
+	raise_z_above(MESH_HOME_Z_SEARCH + 10); //a bit more clearance for clicky
+#else //CLICKY_BED_PROBE
 	raise_z_above(MESH_HOME_Z_SEARCH);
+#endif //CLICKY_BED_PROBE
 	tmc2130_home_enter(1 << axis);
 
 // first axis length measurement begin

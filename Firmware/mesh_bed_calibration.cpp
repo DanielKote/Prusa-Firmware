@@ -19,6 +19,9 @@ float   world2machine_rotation_and_skew[2][2];
 float   world2machine_rotation_and_skew_inv[2][2];
 float   world2machine_shift[2];
 
+bool clicky_attached = false;
+float clicky_dock_z = 0; //last pickup's z for when the dock was located (used for returning clicky to dock)
+
 // Weight of the Y coordinate for the least squares fitting of the bed induction sensor targets.
 // Only used for the first row of the points, which may not befully in reach of the sensor.
 #define WEIGHT_FIRST_ROW_X_HIGH (1.f)
@@ -26,7 +29,21 @@ float   world2machine_shift[2];
 #define WEIGHT_FIRST_ROW_Y_HIGH (0.3f)
 #define WEIGHT_FIRST_ROW_Y_LOW  (0.0f)
 
+#ifdef CLICKY_BED_PROBE
+#define CLICKY_PICKUP_Z 5           //Z height (above the z=0 measured by pinda probe!) for picking up clicky (should have a 2-3mm gap between magnet and pin)
+#define CLICKY_DOCK_X X_MAX_POS - 0 //X position of dock (current design places it at max X position to allow for use of the full 250mm of bed)
+#define CLICKY_PIN_LENGTH 10        //Length of clicky pin - when pin is picked up the extruder moves up by this length to clear the dock
+#endif
 
+#define Z_SENSOR_HIGH_VARIANCE_RETEST //if defined then after z-search is finished its required iterations it will check if average & max deviation is within bounds - if not then retry
+#ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
+#define Z_SENSOR_ALLOWED_AVG_DEVIATION 0.004
+#define Z_SENSOR_ALLOWED_MAX_DEVIATION 0.008
+#define Z_SENSOR_ALLOWED_MAX_RETRIES 6 //if we were forced to retry over 6 times then fail - clearly something is wrong...
+#endif //Z_SENSOR_HIGH_VARIANCE_RETEST
+
+#define Z_SEARCH_FEEDRATE (homing_feedrate[Z_AXIS] / (4 * 60))
+#define Z_LIFT_FEEDRATE (homing_feedrate[Z_AXIS] / (60))
 
 // Scaling of the real machine axes against the programmed dimensions in the firmware.
 // The correction is tiny, here around 0.5mm on 250mm length.
@@ -940,11 +957,14 @@ static inline void update_current_position_z()
 }
 
 // At the current position, find the Z stop.
-
-bool find_bed_induction_sensor_point_z(float minimum_z, uint8_t n_iter, int
+bool find_z_sensor_point_z(float minimum_z, uint8_t n_iter, int
 #ifdef SUPPORT_VERBOSITY
     verbosity_level
 #endif //SUPPORT_VERBOSITY
+    , bool
+#ifdef CLICKY_BED_PROBE
+    use_clicky
+#endif
         )
 {
 	bool high_deviation_occured = false; 
@@ -963,7 +983,15 @@ bool find_bed_induction_sensor_point_z(float minimum_z, uint8_t n_iter, int
 	#endif // SUPPORT_VERBOSITY
 	bool endstops_enabled  = enable_endstops(true);
     bool endstop_z_enabled = enable_z_endstop(false);
+#ifdef CLICKY_BED_PROBE
+    bool clicky_enabled = enable_clicky_zprobe(use_clicky);
+#endif
     float z = 0.f;
+#ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
+    float z_avg_deviation = 0.0f;
+    float z_max_deviation = 0.0f;
+    int full_tries = 0;
+#endif //Z_SENSOR_HIGH_VARIANCE_RETEST
     endstop_z_hit_on_purpose();
 
     // move down until you find the bed
@@ -983,70 +1011,116 @@ bool find_bed_induction_sensor_point_z(float minimum_z, uint8_t n_iter, int
 		goto error; //crash Z detected
 	}
 #endif //TMC2130
-    for (uint8_t i = 0; i < n_iter; ++ i)
-	{
-		
-		current_position[Z_AXIS] += high_deviation_occured ? 0.5 : 0.2;
-		float z_bckp = current_position[Z_AXIS];
-		go_to_current(homing_feedrate[Z_AXIS]/60);
-		// Move back down slowly to find bed.
-        current_position[Z_AXIS] = minimum_z;
-		//printf_P(PSTR("init Z = %f, min_z = %f, i = %d\n"), z_bckp, minimum_z, i);
-        go_to_current(homing_feedrate[Z_AXIS]/(4*60));
-        // we have to let the planner know where we are right now as it is not where we said to go.
-        update_current_position_z();
-		//printf_P(PSTR("Zs: %f, Z: %f, delta Z: %f"), z_bckp, current_position[Z_AXIS], (z_bckp - current_position[Z_AXIS]));
-		if (fabs(current_position[Z_AXIS] - z_bckp) < 0.025) {
-			//printf_P(PSTR("PINDA triggered immediately, move Z higher and repeat measurement\n")); 
-			raise_z(0.5);
-			current_position[Z_AXIS] = minimum_z;
-            go_to_current(homing_feedrate[Z_AXIS]/(4*60));
+
+#ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
+    while(true)
+#endif
+    {
+        for (uint8_t i = 0; i < n_iter; ++ i)
+        {
+            
+            current_position[Z_AXIS] += high_deviation_occured ? 0.5 : 0.2;
+            float z_bckp = current_position[Z_AXIS];
+#ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
+            go_to_current(Z_LIFT_FEEDRATE * ((float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES - full_tries)/(float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES)));
+#else //Z_SENSOR_HIGH_VARIANCE_RETEST
+            go_to_current(Z_LIFT_FEEDRATE);
+#endif //Z_SENSOR_HIGH_VARIANCE_RETEST
+            // Move back down slowly to find bed.
+            current_position[Z_AXIS] = minimum_z;
+            //printf_P(PSTR("init Z = %f, min_z = %f, i = %d\n"), z_bckp, minimum_z, i);
+#ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
+            go_to_current(Z_SEARCH_FEEDRATE * ((float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES - full_tries)/(float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES))); //for any retries conduct search with consequitively slower speeds
+#else //Z_SENSOR_HIGH_VARIANCE_RETEST
+            go_to_current(Z_SEARCH_FEEDRATE);
+#endif //Z_SENSOR_HIGH_VARIANCE_RETEST
             // we have to let the planner know where we are right now as it is not where we said to go.
-			update_current_position_z();
-		}
+            update_current_position_z();
+            //printf_P(PSTR("Zs: %f, Z: %f, delta Z: %f"), z_bckp, current_position[Z_AXIS], (z_bckp - current_position[Z_AXIS]));
+            if (fabs(current_position[Z_AXIS] - z_bckp) < 0.025) {
+                //printf_P(PSTR("PINDA triggered immediately, move Z higher and repeat measurement\n")); 
+                raise_z(0.5);
+                current_position[Z_AXIS] = minimum_z;
+#ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
+                go_to_current(Z_SEARCH_FEEDRATE * ((float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES - full_tries)/(float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES)));
+#else //Z_SENSOR_HIGH_VARIANCE_RETEST
+            go_to_current(Z_SEARCH_FEEDRATE);
+#endif //Z_SENSOR_HIGH_VARIANCE_RETEST
+                // we have to let the planner know where we are right now as it is not where we said to go.
+                update_current_position_z();
+            }
 
 
 
-		if (!endstop_z_hit_on_purpose())
-		{
-			//printf_P(PSTR("i = %d, endstop not hit 2, current_pos[Z]: %f \n"), i, current_position[Z_AXIS]);
-			goto error;
-		}
-#ifdef TMC2130
-		if (!READ(Z_TMC2130_DIAG)) {
-			//printf_P(PSTR("crash detected 2, current_pos[Z]: %f \n"), current_position[Z_AXIS]);
-			goto error; //crash Z detected
-		}
-#endif //TMC2130
-//        SERIAL_ECHOPGM("Bed find_bed_induction_sensor_point_z low, height: ");
-//        MYSERIAL.print(current_position[Z_AXIS], 5);
-//        SERIAL_ECHOLNPGM("");
-		float dz = i?fabs(current_position[Z_AXIS] - (z / i)):0;
-        z += current_position[Z_AXIS];
-		//printf_P(PSTR("Z[%d] = %d, dz=%d\n"), i, (int)(current_position[Z_AXIS] * 1000), (int)(dz * 1000));
-		//printf_P(PSTR("Z- measurement deviation from avg value %f um\n"), dz);
-		if (dz > 0.05) { //deviation > 50um
-			if (high_deviation_occured == false) { //first occurence may be caused in some cases by mechanic resonance probably especially if printer is placed on unstable surface 
-				//printf_P(PSTR("high dev. first occurence\n"));
-				delay_keep_alive(500); //damping
-				//start measurement from the begining, but this time with higher movements in Z axis which should help to reduce mechanical resonance
-				high_deviation_occured = true;
-				i = -1; 
-				z = 0;
-			}
-			else {
-				goto error;
-			}
-		}
+            if (!endstop_z_hit_on_purpose())
+            {
+                //printf_P(PSTR("i = %d, endstop not hit 2, current_pos[Z]: %f \n"), i, current_position[Z_AXIS]);
+                goto error;
+            }
+    #ifdef TMC2130
+            if (!READ(Z_TMC2130_DIAG)) {
+                //printf_P(PSTR("crash detected 2, current_pos[Z]: %f \n"), current_position[Z_AXIS]);
+                goto error; //crash Z detected
+            }
+    #endif //TMC2130
+            //        SERIAL_ECHOPGM("Bed find_bed_induction_sensor_point_z low, height: ");
+            //        MYSERIAL.print(current_position[Z_AXIS], 5);
+            //        SERIAL_ECHOLNPGM("");
+            float dz = i?fabs(current_position[Z_AXIS] - (z / i)):0;
+            z += current_position[Z_AXIS];
+#ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
+            z_avg_deviation += dz;
+            if(dz > z_max_deviation) z_max_deviation = dz;
+#endif //Z_SENSOR_HIGH_VARIANCE_RETEST
+            //printf_P(PSTR("Z[%d] = %d, dz=%d\n"), i, (int)(current_position[Z_AXIS] * 1000), (int)(dz * 1000));
+            //printf_P(PSTR("Z- measurement deviation from avg value %f um\n"), dz);
+            if (dz > 0.05) { //deviation > 50um
+                if (high_deviation_occured == false) { //first occurence may be caused in some cases by mechanic resonance probably especially if printer is placed on unstable surface 
+                    //printf_P(PSTR("high dev. first occurence\n"));
+                    delay_keep_alive(500); //damping
+                    //start measurement from the begining, but this time with higher movements in Z axis which should help to reduce mechanical resonance
+                    high_deviation_occured = true;
+                    i = -1; 
+                    z = 0;
+                }
+                else {
+                    goto error;
+                }
+            }
+        }
 		//printf_P(PSTR("PINDA triggered at %f\n"), current_position[Z_AXIS]);
+#ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
+        full_tries++;
+        if((z_avg_deviation / float(n_iter) <= Z_SENSOR_ALLOWED_AVG_DEVIATION) && (z_max_deviation <= Z_SENSOR_ALLOWED_MAX_DEVIATION)) {
+            break;
+        } else {
+            z = 0;
+            z_max_deviation = 0;
+            z_avg_deviation = 0;
+        }
+
+        if(full_tries > Z_SENSOR_ALLOWED_MAX_RETRIES) {
+            printf_P(PSTR("too many retries required for point"));
+            goto error;
+        }
+#endif //Z_SENSOR_HIGH_VARIANCE_RETEST
     }
     current_position[Z_AXIS] = z;
     if (n_iter > 1)
+    {
         current_position[Z_AXIS] /= float(n_iter);
+#ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
+        z_avg_deviation /= float(n_iter);
+#endif //Z_SENSOR_HIGH_VARIANCE_RETEST
+    }
 
+    //printf_P(PSTR("%d tries; %d samples; avg-deviation: %.3f, max-deviation: %.3f"), full_tries, n_iter, z_avg_deviation, z_max_deviation);
 
     enable_endstops(endstops_enabled);
     enable_z_endstop(endstop_z_enabled);
+#ifdef CLICKY_BED_PROBE
+    enable_clicky_zprobe(clicky_enabled);
+#endif
 //    SERIAL_ECHOLNPGM("find_bed_induction_sensor_point_z 3");
 #ifdef TMC2130
     if (bHighPowerForced) FORCE_HIGH_POWER_END;
@@ -1058,6 +1132,9 @@ error:
 //    SERIAL_ECHOLNPGM("find_bed_induction_sensor_point_z 4");
     enable_endstops(endstops_enabled);
     enable_z_endstop(endstop_z_enabled);
+#ifdef CLICKY_BED_PROBE
+    enable_clicky_zprobe(clicky_enabled);
+#endif
 #ifdef TMC2130
 	if (bHighPowerForced) FORCE_HIGH_POWER_END;
 #endif
@@ -2813,6 +2890,14 @@ bool sample_z() {
     return sampled;
 }
 
+void lift_z_then_kill(const char *full_screen_message)
+{
+    current_position[Z_AXIS] += 15;
+    go_to_current(homing_feedrate[Z_AXIS]/60);
+    st_synchronize();
+    kill(full_screen_message);
+}
+
 void go_home_with_z_lift()
 {
     // Don't let the manage_inactivity() function remove power from the motors.
@@ -2832,6 +2917,78 @@ void go_home_with_z_lift()
     go_to_current(homing_feedrate[Z_AXIS] / 60);
 }
 
+#ifdef CLICKY_BED_PROBE
+bool pick_up_clicky()
+{
+#ifndef CLICKY_IGNORE_PICKUP_DROPOFF
+    if(!clicky_attached)
+    {
+        //printf_P(PSTR("PICKING UP CLICKY"));
+        //pick up the clicky pin from its holder (rightmost x position)
+        current_position[Z_AXIS] = CLICKY_PICKUP_Z;
+        go_to_current(homing_feedrate[Z_AXIS]/60);
+        current_position[X_AXIS] = CLICKY_DOCK_X;
+        go_to_current(homing_feedrate[X_AXIS]/15);
+
+        if(!find_bed_clicky_sensor_point_z(-5, 1))
+        {
+            kill(_T(MSG_BED_LEVELING_FAILED_CLICKY_PIN_NOT_FOIND));
+            return false;
+        }
+        clicky_dock_z = current_position[Z_AXIS] + 1;
+
+        current_position[Z_AXIS] += CLICKY_PIN_LENGTH;
+        go_to_current(homing_feedrate[Z_AXIS]/60);
+        current_position[X_AXIS] -= 20 + X_PROBE_OFFSET_FROM_EXTRUDER;
+        go_to_current(homing_feedrate[X_AXIS]/15);
+
+        if(!find_bed_clicky_sensor_point_z(-1, 1))
+        {
+            lift_z_then_kill(_T(MSG_BED_LEVELING_FAILED_CLICKY_PIN_NOT_FOIND));
+            return false;
+        }
+        current_position[Z_AXIS] += 1.5;
+        go_to_current(homing_feedrate[Z_AXIS]/30);
+    }
+    clicky_attached = true;
+#endif //CLICKY_IGNORE_PICKUP_DROPOFF
+    return true;
+}
+
+bool drop_off_clicky(float expected_z)
+{
+#ifndef CLICKY_IGNORE_PICKUP_DROPOFF
+    if(clicky_attached)
+    {
+        //printf_P(PSTR("DROPPING OFF CLICKY"));
+        //deposit clicky pin back to its holder
+        current_position[Z_AXIS] = clicky_dock_z + CLICKY_PIN_LENGTH;
+        go_to_current(homing_feedrate[Z_AXIS]/60);
+        current_position[X_AXIS] = CLICKY_DOCK_X;
+        current_position[Y_AXIS] = 0;
+        go_to_current(homing_feedrate[X_AXIS]/15);
+        current_position[Z_AXIS] = clicky_dock_z;
+        go_to_current(homing_feedrate[Z_AXIS]/60);
+
+        //wipe off the clicky pin by moving sideways (slowly) for the first 5mm, then go to a point guaranteed to be over build-plate
+        current_position[X_AXIS] -= 5;
+        go_to_current(homing_feedrate[X_AXIS]/240);
+        current_position[X_AXIS] -= 20 + X_PROBE_OFFSET_FROM_EXTRUDER;
+        go_to_current(homing_feedrate[X_AXIS]/15);
+
+        //try to find the bed, but not too hard - if we fail to find the bed that is good! that means that the clicky pin was depsoted correctly (if the bed is found, then that means pin is still on the probe... error!)
+        if(find_bed_clicky_sensor_point_z(expected_z - 1, 1))
+        {
+            lift_z_then_kill(_T(MSG_BED_LEVELING_FAILED_CANT_DEPOSIT_CLICKY_PIN));
+            return false;
+        }
+    }
+    clicky_attached = false;
+#endif //CLICKY_IGNORE_PICKUP_DROPOFF
+    return true;
+}
+#endif //CLICKY_BED_PROBE
+
 // Sample the 9 points of the bed and store them into the EEPROM as a reference.
 // When calling this function, the X, Y, Z axes should be already homed,
 // and the world2machine correction matrix should be active.
@@ -2841,14 +2998,25 @@ bool sample_mesh_and_store_reference()
     bool endstops_enabled  = enable_endstops(false);
     bool endstop_z_enabled = enable_z_endstop(false);
 
+#ifdef CLICKY_BED_PROBE
+    float clicky_z_offset = 0.0f;
+#endif // CLICKY_BED_PROBE
+
     // Don't let the manage_inactivity() function remove power from the motors.
     refresh_cmd_timeout();
+
+#ifdef CLICKY_BED_PROBE
+#ifdef MESH_BED_CALIBRATION_SHOW_LCD
+    lcd_display_message_fullscreen_P(_T(MSG_CALIBRATE_Z_AUTO));
+#endif //MESH_BED_CALIBRATION_SHOW_LCD
+#else //CLICKY_BED_PROBE
 
 #ifdef MESH_BED_CALIBRATION_SHOW_LCD
     lcd_display_message_fullscreen_P(_T(MSG_MEASURE_BED_REFERENCE_HEIGHT_LINE1));
     // display "point xx of yy"
     lcd_puts_at_P(0,3,_n("1/9"));
 #endif /* MESH_BED_CALIBRATION_SHOW_LCD */
+#endif //CLICKY_BED_PROBE
 
     // Sample Z heights for the mesh bed leveling.
     // In addition, store the results into an eeprom, to be used later for verification of the bed leveling process.
@@ -2873,24 +3041,47 @@ bool sample_mesh_and_store_reference()
 #endif //TMC2130
 
         enable_endstops(false);
+
+#ifdef CLICKY_BED_PROBE
+#ifdef MESH_BED_CALIBRATION_SHOW_LCD
+    lcd_display_message_fullscreen_P(_T(MSG_BED_LEVELING_PICKING_UP_CLICKY));
+#endif //MESH_BED_CALIBRATION_SHOW_LCD
+    st_synchronize();
+    if(!pick_up_clicky()) return false;
+    st_synchronize();
+    clicky_z_offset = current_position[Z_AXIS];
+#ifdef MESH_BED_CALIBRATION_SHOW_LCD
+    lcd_display_message_fullscreen_P(_T(MSG_MEASURE_BED_REFERENCE_HEIGHT_LINE1));
+#endif //MESH_BED_CALIBRATION_SHOW_LCD
+#else //CLICKY_BED_PROBE
+        //pinda based homing will use original home z as the 0,0 mesh point
 		if (!find_bed_induction_sensor_point_z()) //Z crash or deviation > 50um
 		{
 			kill(_T(MSG_BED_LEVELING_FAILED_POINT_LOW));
 			return false;
 		}
         mbl.set_z(0, 0, current_position[Z_AXIS]);
+#endif //CLICKY_BED_PROBE
+
     }
     static_assert(MESH_MEAS_NUM_X_POINTS * MESH_MEAS_NUM_Y_POINTS <= 255, "overflow.....");
+#ifdef CLICKY_BED_PROBE
+    for (uint8_t mesh_point = 0; mesh_point != MESH_MEAS_NUM_X_POINTS * MESH_MEAS_NUM_Y_POINTS; ++ mesh_point) {
+#else //CLICKY_BED_PROBE
     for (uint8_t mesh_point = 1; mesh_point != MESH_MEAS_NUM_X_POINTS * MESH_MEAS_NUM_Y_POINTS; ++ mesh_point) {
+#endif //CLICKY_BED_PROBE
         // Don't let the manage_inactivity() function remove power from the motors.
         refresh_cmd_timeout();
         // Print the decrasing ID of the measurement point.
         current_position[Z_AXIS] = MESH_HOME_Z_SEARCH;
-        go_to_current(homing_feedrate[Z_AXIS]/60);
+#ifdef CLICKY_BED_PROBE
+        current_position[Z_AXIS] += clicky_z_offset;
+#endif //CLICKY_BED_PROBE
+        go_to_current(Z_LIFT_FEEDRATE);
 		uint8_t ix = mesh_point % MESH_MEAS_NUM_X_POINTS;
 		uint8_t iy = mesh_point / MESH_MEAS_NUM_X_POINTS;
 		if (iy & 1) ix = (MESH_MEAS_NUM_X_POINTS - 1) - ix; // Zig zag
-		current_position[X_AXIS] = BED_X(ix * 3);
+        current_position[X_AXIS] = BED_X(ix * 3);
 		current_position[Y_AXIS] = BED_Y(iy * 3);
         world2machine_clamp(current_position[X_AXIS], current_position[Y_AXIS]);
         go_to_current(homing_feedrate[X_AXIS]/60);
@@ -2899,7 +3090,11 @@ bool sample_mesh_and_store_reference()
 		lcd_set_cursor(0, 3);
         lcd_printf_P(PSTR("%d/9"),mesh_point+1);
 #endif /* MESH_BED_CALIBRATION_SHOW_LCD */
-		if (!find_bed_induction_sensor_point_z()) //Z crash or deviation > 50um
+#ifdef CLICKY_BED_PROBE
+		if (!find_bed_clicky_sensor_point_z(-1)) //Z crash or deviation > 50um
+#else //CLICKY_BED_PROBE
+        if (!find_bed_induction_sensor_point_z()) //Z crash or deviation > 50um
+#endif //CLICKY_BED_PROBE
 		{
 			kill(_T(MSG_BED_LEVELING_FAILED_POINT_LOW));
 			return false;
@@ -2908,6 +3103,15 @@ bool sample_mesh_and_store_reference()
        
         mbl.set_z(ix, iy, current_position[Z_AXIS]);
     }
+
+#ifdef CLICKY_BED_PROBE
+#ifdef MESH_BED_CALIBRATION_SHOW_LCD
+    lcd_display_message_fullscreen_P(_T(MSG_BED_LEVELING_DROPPING_OFF_CLICKY));
+#endif //MESH_BED_CALIBRATION_SHOW_LCD
+    st_synchronize();
+    if(!drop_off_clicky(mbl.z_values[0][MESH_MEAS_NUM_X_POINTS-1])) return false;
+#endif //CLICKY_BED_PROBE
+
     {
         // Verify the span of the Z values.
         float zmin = mbl.z_values[0][0];
@@ -2924,6 +3128,20 @@ bool sample_mesh_and_store_reference()
             return false;
         }
     }
+
+    /*
+    //Print out the bed measurements data for dev purposes
+    SERIAL_ECHOPGM("\nBED Z-JITTER DATA\n");
+    for(int_least8_t i = 0; i < 3; i++)
+    {
+        for(int_least8_t j=0; j<3; j++)
+        {
+            SERIAL_ECHO((int)((mbl.z_values[i][j] - mbl.z_values[0][0]) * 1000));
+            SERIAL_ECHOPGM(",");
+        }
+        SERIAL_ECHOPGM("\n");
+    }
+    //*/
 
     // Store the correction values to EEPROM.
     // Offsets of the Z heiths of the calibration points from the first point.
