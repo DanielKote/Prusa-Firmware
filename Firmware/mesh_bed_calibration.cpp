@@ -35,6 +35,13 @@ float clicky_dock_z = 0; //last pickup's z for when the dock was located (used f
 #define CLICKY_PIN_LENGTH 10        //Length of clicky pin - when pin is picked up the extruder moves up by this length to clear the dock
 #endif
 
+#define Z_SENSOR_HIGH_VARIANCE_RETEST //if defined then after z-search is finished its required iterations it will check if average & max deviation is within bounds - if not then retry
+#ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
+#define Z_SENSOR_ALLOWED_AVG_DEVIATION 0.003
+#define Z_SENSOR_ALLOWED_MAX_DEVIATION 0.006
+#define Z_SENSOR_ALLOWED_MAX_RETRIES 8 //if we were forced to retry over 5 times then fail - clearly something is wrong...
+#endif //Z_SENSOR_HIGH_VARIANCE_RETEST
+
 #define Z_SEARCH_FEEDRATE (homing_feedrate[Z_AXIS] / (4 * 60))
 #define Z_LIFT_FEEDRATE (homing_feedrate[Z_AXIS] / (60))
 
@@ -982,6 +989,7 @@ bool find_z_sensor_point_z(float minimum_z, uint8_t n_iter, int
     float z = 0.f;
     float z_avg_deviation = 0.0f;
     float z_max_deviation = 0.0f;
+    int full_tries = 0;
     endstop_z_hit_on_purpose();
 
     // move down until you find the bed
@@ -1001,64 +1009,89 @@ bool find_z_sensor_point_z(float minimum_z, uint8_t n_iter, int
 		goto error; //crash Z detected
 	}
 #endif //TMC2130
-    for (uint8_t i = 0; i < n_iter; ++ i)
-	{
-        
-		current_position[Z_AXIS] += high_deviation_occured ? 0.5 : 0.2;
-		float z_bckp = current_position[Z_AXIS];
-		go_to_current(Z_LIFT_FEEDRATE);
-		// Move back down slowly to find bed.
-        current_position[Z_AXIS] = minimum_z;
-		//printf_P(PSTR("init Z = %f, min_z = %f, i = %d\n"), z_bckp, minimum_z, i);
-        go_to_current(Z_SEARCH_FEEDRATE);
-        // we have to let the planner know where we are right now as it is not where we said to go.
-        update_current_position_z();
-		//printf_P(PSTR("Zs: %f, Z: %f, delta Z: %f"), z_bckp, current_position[Z_AXIS], (z_bckp - current_position[Z_AXIS]));
-		if (fabs(current_position[Z_AXIS] - z_bckp) < 0.025) {
-			//printf_P(PSTR("PINDA triggered immediately, move Z higher and repeat measurement\n")); 
-			raise_z(0.5);
-			current_position[Z_AXIS] = minimum_z;
+
+#ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
+    while(true)
+#endif
+    {
+        for (uint8_t i = 0; i < n_iter; ++ i)
+        {
+            
+            current_position[Z_AXIS] += high_deviation_occured ? 0.5 : 0.2;
+            float z_bckp = current_position[Z_AXIS];
+            go_to_current(Z_LIFT_FEEDRATE);
+            // Move back down slowly to find bed.
+            current_position[Z_AXIS] = minimum_z;
+            //printf_P(PSTR("init Z = %f, min_z = %f, i = %d\n"), z_bckp, minimum_z, i);
             go_to_current(Z_SEARCH_FEEDRATE);
             // we have to let the planner know where we are right now as it is not where we said to go.
-			update_current_position_z();
-		}
+            update_current_position_z();
+            //printf_P(PSTR("Zs: %f, Z: %f, delta Z: %f"), z_bckp, current_position[Z_AXIS], (z_bckp - current_position[Z_AXIS]));
+            if (fabs(current_position[Z_AXIS] - z_bckp) < 0.025) {
+                //printf_P(PSTR("PINDA triggered immediately, move Z higher and repeat measurement\n")); 
+                raise_z(0.5);
+                current_position[Z_AXIS] = minimum_z;
+                go_to_current(Z_SEARCH_FEEDRATE);
+                // we have to let the planner know where we are right now as it is not where we said to go.
+                update_current_position_z();
+            }
 
 
 
-		if (!endstop_z_hit_on_purpose())
-		{
-			//printf_P(PSTR("i = %d, endstop not hit 2, current_pos[Z]: %f \n"), i, current_position[Z_AXIS]);
-			goto error;
-		}
-#ifdef TMC2130
-		if (!READ(Z_TMC2130_DIAG)) {
-			//printf_P(PSTR("crash detected 2, current_pos[Z]: %f \n"), current_position[Z_AXIS]);
-			goto error; //crash Z detected
-		}
-#endif //TMC2130
-        //        SERIAL_ECHOPGM("Bed find_bed_induction_sensor_point_z low, height: ");
-        //        MYSERIAL.print(current_position[Z_AXIS], 5);
-        //        SERIAL_ECHOLNPGM("");
-		float dz = i?fabs(current_position[Z_AXIS] - (z / i)):0;
-        z += current_position[Z_AXIS];
-        z_avg_deviation += dz;
-        if(dz > z_max_deviation) z_max_deviation = dz;
-		//printf_P(PSTR("Z[%d] = %d, dz=%d\n"), i, (int)(current_position[Z_AXIS] * 1000), (int)(dz * 1000));
-		//printf_P(PSTR("Z- measurement deviation from avg value %f um\n"), dz);
-		if (dz > 0.05) { //deviation > 50um
-			if (high_deviation_occured == false) { //first occurence may be caused in some cases by mechanic resonance probably especially if printer is placed on unstable surface 
-				//printf_P(PSTR("high dev. first occurence\n"));
-				delay_keep_alive(500); //damping
-				//start measurement from the begining, but this time with higher movements in Z axis which should help to reduce mechanical resonance
-				high_deviation_occured = true;
-				i = -1; 
-				z = 0;
-			}
-			else {
-				goto error;
-			}
-		}
+            if (!endstop_z_hit_on_purpose())
+            {
+                //printf_P(PSTR("i = %d, endstop not hit 2, current_pos[Z]: %f \n"), i, current_position[Z_AXIS]);
+                goto error;
+            }
+    #ifdef TMC2130
+            if (!READ(Z_TMC2130_DIAG)) {
+                //printf_P(PSTR("crash detected 2, current_pos[Z]: %f \n"), current_position[Z_AXIS]);
+                goto error; //crash Z detected
+            }
+    #endif //TMC2130
+            //        SERIAL_ECHOPGM("Bed find_bed_induction_sensor_point_z low, height: ");
+            //        MYSERIAL.print(current_position[Z_AXIS], 5);
+            //        SERIAL_ECHOLNPGM("");
+            float dz = i?fabs(current_position[Z_AXIS] - (z / i)):0;
+            z += current_position[Z_AXIS];
+            z_avg_deviation += dz;
+            if(dz > z_max_deviation) z_max_deviation = dz;
+            //printf_P(PSTR("Z[%d] = %d, dz=%d\n"), i, (int)(current_position[Z_AXIS] * 1000), (int)(dz * 1000));
+            //printf_P(PSTR("Z- measurement deviation from avg value %f um\n"), dz);
+            if (dz > 0.05) { //deviation > 50um
+                if (high_deviation_occured == false) { //first occurence may be caused in some cases by mechanic resonance probably especially if printer is placed on unstable surface 
+                    //printf_P(PSTR("high dev. first occurence\n"));
+                    delay_keep_alive(500); //damping
+                    //start measurement from the begining, but this time with higher movements in Z axis which should help to reduce mechanical resonance
+                    high_deviation_occured = true;
+                    i = -1; 
+                    z = 0;
+                }
+                else {
+                    goto error;
+                }
+            }
+        }
 		//printf_P(PSTR("PINDA triggered at %f\n"), current_position[Z_AXIS]);
+#ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
+        full_tries++;
+        if((z_avg_deviation / float(n_iter) <= Z_SENSOR_ALLOWED_AVG_DEVIATION) && (z_max_deviation <= Z_SENSOR_ALLOWED_MAX_DEVIATION)) {
+            break;
+        } else {
+            z = 0;
+            z_max_deviation = 0;
+            z_avg_deviation = 0;
+            current_position[Z_AXIS] += 1.5;
+            go_to_current(Z_LIFT_FEEDRATE);
+            current_position[Z_AXIS] -= 1.5;
+            go_to_current(Z_LIFT_FEEDRATE);
+        }
+
+        if(full_tries > Z_SENSOR_ALLOWED_MAX_RETRIES) {
+            printf_P(PSTR("too many retries required for point"));
+            goto error;
+        }
+#endif
     }
     current_position[Z_AXIS] = z;
     if (n_iter > 1)
@@ -1067,7 +1100,7 @@ bool find_z_sensor_point_z(float minimum_z, uint8_t n_iter, int
         z_avg_deviation /= float(n_iter);
     }
 
-    printf_P(PSTR("%d samples; avg-deviation: %.3f, max-deviation: %.3f"), n_iter, z_avg_deviation, z_max_deviation);
+    //printf_P(PSTR("%d tries; %d samples; avg-deviation: %.3f, max-deviation: %.3f"), full_tries, n_iter, z_avg_deviation, z_max_deviation);
 
     enable_endstops(endstops_enabled);
     enable_z_endstop(endstop_z_enabled);
