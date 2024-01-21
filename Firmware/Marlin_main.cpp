@@ -2916,13 +2916,11 @@ static void gcode_G80()
     custom_message_state = meshPointsToProbe + 10;
     lcd_update(1);
 
+#ifndef CLICKY_BED_PROBE
     // Lift Z to a safe position before probing the first point
-    current_position[Z_AXIS] = MESH_HOME_Z_SEARCH
-#ifdef CLICKY_BED_PROBE
-        + clicky_z_offset;
-#endif //CLICKY_BED_PROBE
-        ;
+    current_position[Z_AXIS] = MESH_HOME_Z_SEARCH;
     plan_buffer_line_curposXYZE(Z_LIFT_FEEDRATE);
+#endif //!CLICKY_BED_PROBE
 
     // Cycle through all points and probe them
     int l_feedmultiply = setup_for_endstop_move(false); //save feedrate and feedmultiply, sets feedmultiply to 100
