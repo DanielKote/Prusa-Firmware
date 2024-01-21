@@ -987,9 +987,11 @@ bool find_z_sensor_point_z(float minimum_z, uint8_t n_iter, int
     bool clicky_enabled = enable_clicky_zprobe(use_clicky);
 #endif
     float z = 0.f;
+#ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
     float z_avg_deviation = 0.0f;
     float z_max_deviation = 0.0f;
     int full_tries = 0;
+#endif //Z_SENSOR_HIGH_VARIANCE_RETEST
     endstop_z_hit_on_purpose();
 
     // move down until you find the bed
@@ -1019,11 +1021,19 @@ bool find_z_sensor_point_z(float minimum_z, uint8_t n_iter, int
             
             current_position[Z_AXIS] += high_deviation_occured ? 0.5 : 0.2;
             float z_bckp = current_position[Z_AXIS];
+#ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
+            go_to_current(Z_LIFT_FEEDRATE * ((float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES - full_tries)/(float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES)));
+#else //Z_SENSOR_HIGH_VARIANCE_RETEST
             go_to_current(Z_LIFT_FEEDRATE);
+#endif //Z_SENSOR_HIGH_VARIANCE_RETEST
             // Move back down slowly to find bed.
             current_position[Z_AXIS] = minimum_z;
             //printf_P(PSTR("init Z = %f, min_z = %f, i = %d\n"), z_bckp, minimum_z, i);
+#ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
             go_to_current(Z_SEARCH_FEEDRATE * ((float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES - full_tries)/(float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES))); //for any retries conduct search with consequitively slower speeds
+#else //Z_SENSOR_HIGH_VARIANCE_RETEST
+            go_to_current(Z_SEARCH_FEEDRATE);
+#endif //Z_SENSOR_HIGH_VARIANCE_RETEST
             // we have to let the planner know where we are right now as it is not where we said to go.
             update_current_position_z();
             //printf_P(PSTR("Zs: %f, Z: %f, delta Z: %f"), z_bckp, current_position[Z_AXIS], (z_bckp - current_position[Z_AXIS]));
@@ -1031,7 +1041,11 @@ bool find_z_sensor_point_z(float minimum_z, uint8_t n_iter, int
                 //printf_P(PSTR("PINDA triggered immediately, move Z higher and repeat measurement\n")); 
                 raise_z(0.5);
                 current_position[Z_AXIS] = minimum_z;
+#ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
                 go_to_current(Z_SEARCH_FEEDRATE * ((float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES - full_tries)/(float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES)));
+#else //Z_SENSOR_HIGH_VARIANCE_RETEST
+            go_to_current(Z_SEARCH_FEEDRATE);
+#endif //Z_SENSOR_HIGH_VARIANCE_RETEST
                 // we have to let the planner know where we are right now as it is not where we said to go.
                 update_current_position_z();
             }
@@ -1054,8 +1068,10 @@ bool find_z_sensor_point_z(float minimum_z, uint8_t n_iter, int
             //        SERIAL_ECHOLNPGM("");
             float dz = i?fabs(current_position[Z_AXIS] - (z / i)):0;
             z += current_position[Z_AXIS];
+#ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
             z_avg_deviation += dz;
             if(dz > z_max_deviation) z_max_deviation = dz;
+#endif //Z_SENSOR_HIGH_VARIANCE_RETEST
             //printf_P(PSTR("Z[%d] = %d, dz=%d\n"), i, (int)(current_position[Z_AXIS] * 1000), (int)(dz * 1000));
             //printf_P(PSTR("Z- measurement deviation from avg value %f um\n"), dz);
             if (dz > 0.05) { //deviation > 50um
@@ -1087,13 +1103,15 @@ bool find_z_sensor_point_z(float minimum_z, uint8_t n_iter, int
             printf_P(PSTR("too many retries required for point"));
             goto error;
         }
-#endif
+#endif //Z_SENSOR_HIGH_VARIANCE_RETEST
     }
     current_position[Z_AXIS] = z;
     if (n_iter > 1)
     {
         current_position[Z_AXIS] /= float(n_iter);
+#ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
         z_avg_deviation /= float(n_iter);
+#endif //Z_SENSOR_HIGH_VARIANCE_RETEST
     }
 
     //printf_P(PSTR("%d tries; %d samples; avg-deviation: %.3f, max-deviation: %.3f"), full_tries, n_iter, z_avg_deviation, z_max_deviation);
