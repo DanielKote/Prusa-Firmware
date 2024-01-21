@@ -37,9 +37,9 @@ float clicky_dock_z = 0; //last pickup's z for when the dock was located (used f
 
 #define Z_SENSOR_HIGH_VARIANCE_RETEST //if defined then after z-search is finished its required iterations it will check if average & max deviation is within bounds - if not then retry
 #ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
-#define Z_SENSOR_ALLOWED_AVG_DEVIATION 0.003
-#define Z_SENSOR_ALLOWED_MAX_DEVIATION 0.006
-#define Z_SENSOR_ALLOWED_MAX_RETRIES 8 //if we were forced to retry over 5 times then fail - clearly something is wrong...
+#define Z_SENSOR_ALLOWED_AVG_DEVIATION 0.004
+#define Z_SENSOR_ALLOWED_MAX_DEVIATION 0.008
+#define Z_SENSOR_ALLOWED_MAX_RETRIES 6 //if we were forced to retry over 6 times then fail - clearly something is wrong...
 #endif //Z_SENSOR_HIGH_VARIANCE_RETEST
 
 #define Z_SEARCH_FEEDRATE (homing_feedrate[Z_AXIS] / (4 * 60))
@@ -1023,7 +1023,7 @@ bool find_z_sensor_point_z(float minimum_z, uint8_t n_iter, int
             // Move back down slowly to find bed.
             current_position[Z_AXIS] = minimum_z;
             //printf_P(PSTR("init Z = %f, min_z = %f, i = %d\n"), z_bckp, minimum_z, i);
-            go_to_current(Z_SEARCH_FEEDRATE);
+            go_to_current(Z_SEARCH_FEEDRATE * ((float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES - full_tries)/(float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES))); //for any retries conduct search with consequitively slower speeds
             // we have to let the planner know where we are right now as it is not where we said to go.
             update_current_position_z();
             //printf_P(PSTR("Zs: %f, Z: %f, delta Z: %f"), z_bckp, current_position[Z_AXIS], (z_bckp - current_position[Z_AXIS]));
@@ -1031,7 +1031,7 @@ bool find_z_sensor_point_z(float minimum_z, uint8_t n_iter, int
                 //printf_P(PSTR("PINDA triggered immediately, move Z higher and repeat measurement\n")); 
                 raise_z(0.5);
                 current_position[Z_AXIS] = minimum_z;
-                go_to_current(Z_SEARCH_FEEDRATE);
+                go_to_current(Z_SEARCH_FEEDRATE * ((float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES - full_tries)/(float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES)));
                 // we have to let the planner know where we are right now as it is not where we said to go.
                 update_current_position_z();
             }
@@ -1081,10 +1081,6 @@ bool find_z_sensor_point_z(float minimum_z, uint8_t n_iter, int
             z = 0;
             z_max_deviation = 0;
             z_avg_deviation = 0;
-            current_position[Z_AXIS] += 1.5;
-            go_to_current(Z_LIFT_FEEDRATE);
-            current_position[Z_AXIS] -= 1.5;
-            go_to_current(Z_LIFT_FEEDRATE);
         }
 
         if(full_tries > Z_SENSOR_ALLOWED_MAX_RETRIES) {
