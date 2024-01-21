@@ -5090,7 +5090,7 @@ void process_commands()
     Default 3x3 grid can be changed on MK2.5/s and MK3/s to 7x7 grid.
     #### Usage
 	  
-          G80 [ N | C | O | M | L | R | F | B | X | Y | W | H ]
+          G80 [ N | C | O | M | D | E | F | H | I | J | P | Q | R | X | Y | W | H ]
       
 	#### Parameters
       - `N` - Number of mesh points on x axis. Default is value stored in EEPROM. Valid values are 3 and 7.
