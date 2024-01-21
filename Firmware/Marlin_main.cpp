@@ -2792,11 +2792,15 @@ static void gcode_G28(bool home_x_axis, bool home_y_axis, bool home_z_axis)
 // G80 - Automatic mesh bed leveling
 static void gcode_G80()
 {
+#ifdef CLICKY_BED_PROBE
+    const bool use_clicky = !code_seen('K');
+#endif
+
     constexpr float XY_AXIS_FEEDRATE = (homing_feedrate[X_AXIS] * 3) / 60;
 #ifdef CLICKY_BED_PROBE
-    constexpr float Z_LIFT_FEEDRATE = homing_feedrate[Z_AXIS] / 30;
-    constexpr float Z_CALIBRATION_THRESHOLD = 0.5f;
-    constexpr float MESH_HOME_Z_SEARCH_FAST = 1.00f; //physical probe needs to move up higher to ensure it doesnt collide with bed during move operations
+    const float Z_LIFT_FEEDRATE = use_clicky? homing_feedrate[Z_AXIS] / 30 : homing_feedrate[Z_AXIS] / 60;
+    const float Z_CALIBRATION_THRESHOLD = use_clicky? 0.5f : 0.35f;
+    const float MESH_HOME_Z_SEARCH_FAST = use_clicky? 1.0f : 0.35f; //physical probe needs to move up higher to ensure it doesnt collide with bed during move operations
 #else
     constexpr float Z_LIFT_FEEDRATE = homing_feedrate[Z_AXIS] / 60;
     constexpr float Z_CALIBRATION_THRESHOLD = 0.35f;
@@ -2851,27 +2855,29 @@ static void gcode_G80()
     babystep_undo();
 
 #ifdef CLICKY_BED_PROBE
-    lcd_setstatuspgm(MSG_BED_LEVELING_PICKING_UP_CLICKY);
-    custom_message_type = CustomMsg::Status;
-    lcd_update(1);
-    if(!pick_up_clicky()) return;
+    if(use_clicky) {
+        lcd_setstatuspgm(MSG_BED_LEVELING_PICKING_UP_CLICKY);
+        custom_message_type = CustomMsg::Status;
+        lcd_update(1);
+        if(!pick_up_clicky()) return;
 
-    //measure 0,0 point with clicky to ensure loaded y-offset data is properly offset by 0,0
-    current_position[Z_AXIS] += MESH_HOME_Z_SEARCH;
-    plan_buffer_line_curposXYZE(Z_LIFT_FEEDRATE);
-    st_synchronize();
+        //measure 0,0 point with clicky to ensure loaded y-offset data is properly offset by 0,0
+        current_position[Z_AXIS] += MESH_HOME_Z_SEARCH;
+        plan_buffer_line_curposXYZE(Z_LIFT_FEEDRATE);
+        st_synchronize();
 
-    current_position[X_AXIS] = BED_X(0);
-    current_position[Y_AXIS] = BED_Y(0);
-    world2machine_clamp(current_position[X_AXIS], current_position[Y_AXIS]);
-    plan_buffer_line_curposXYZE(XY_AXIS_FEEDRATE);
-    st_synchronize();
-    if (!find_bed_clicky_sensor_point_z( -1.0f, nProbeRetryCount)) {
-        kill(_i("Mesh bed leveling failed. Cant find 0,0 point")); ////MSG_MBL_ZZ_FAIL c=20 r=2?
+        current_position[X_AXIS] = BED_X(0);
+        current_position[Y_AXIS] = BED_Y(0);
+        world2machine_clamp(current_position[X_AXIS], current_position[Y_AXIS]);
+        plan_buffer_line_curposXYZE(XY_AXIS_FEEDRATE);
+        st_synchronize();
+        if (!find_bed_clicky_sensor_point_z( -1.0f, nProbeRetryCount)) {
+            kill(_i("Mesh bed leveling failed. Cant find 0,0 point")); ////MSG_MBL_ZZ_FAIL c=20 r=2?
+        }
+        st_synchronize();
+        mbl.set_z(0,0, current_position[Z_AXIS]);
     }
-    st_synchronize();
-    mbl.set_z(0,0, current_position[Z_AXIS]);
-    const float clicky_z_offset = current_position[Z_AXIS];
+    const float clicky_z_offset = use_clicky? current_position[Z_AXIS] : 0;
 #endif //CLICKY_BED_PROBE
 
     // Initialize the default mesh from eeprom and calculate how many points are to be probed
@@ -2916,21 +2922,26 @@ static void gcode_G80()
     custom_message_state = meshPointsToProbe + 10;
     lcd_update(1);
 
-#ifndef CLICKY_BED_PROBE
-    // Lift Z to a safe position before probing the first point
-    current_position[Z_AXIS] = MESH_HOME_Z_SEARCH;
-    plan_buffer_line_curposXYZE(Z_LIFT_FEEDRATE);
+#ifdef CLICKY_BED_PROBE
+    if(!use_clicky)
 #endif //!CLICKY_BED_PROBE
+    {
+        // Lift Z to a safe position before probing the first point
+        current_position[Z_AXIS] = MESH_HOME_Z_SEARCH;
+        plan_buffer_line_curposXYZE(Z_LIFT_FEEDRATE);
+    }
 
     // Cycle through all points and probe them
     int l_feedmultiply = setup_for_endstop_move(false); //save feedrate and feedmultiply, sets feedmultiply to 100
     uint8_t mesh_point = 0; //index number of calibration point
 
 #ifdef CLICKY_BED_PROBE
-    //skip 0th mesh point due to having done it already in order to establish clicky baseline
-    custom_message_state--;
-    mesh_point++;
-    lcd_update(1);
+    if(use_clicky) {
+        //skip 0th mesh point due to having done it already in order to establish clicky baseline
+        custom_message_state--;
+        mesh_point++;
+        lcd_update(1);
+    }
 #endif //CLICKY_BED_PROBE
 
     while (mesh_point != MESH_NUM_X_POINTS * MESH_NUM_Y_POINTS) {
@@ -2982,7 +2993,7 @@ static void gcode_G80()
 
         // Go down until endstop is hit
 #ifdef CLICKY_BED_PROBE
-        if (!find_bed_clicky_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : 0.0f, nProbeRetryCount)) { //if we have data from z calibration max allowed difference is 1mm for each point, if we dont have data max difference is 10mm from initial point
+        if ((use_clicky && !find_bed_clicky_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : 0.0f, nProbeRetryCount)) || (!use_clicky && !find_bed_induction_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : -10.f, nProbeRetryCount))) { //if we have data from z calibration max allowed difference is 1mm for each point, if we dont have data max difference is 10mm from initial point
 #else //CLICKY_BED_PROBE
         if (!find_bed_induction_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : -10.f, nProbeRetryCount)) { //if we have data from z calibration max allowed difference is 1mm for each point, if we dont have data max difference is 10mm from initial point
 #endif //CLICKY_BED_PROBE
@@ -2997,7 +3008,7 @@ static void gcode_G80()
             st_synchronize();
 
 #ifdef CLICKY_BED_PROBE
-            if (!find_bed_clicky_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : 0.0f, nProbeRetryCount)) { //if we have data from z calibration max allowed difference is 1mm for each point, if we dont have data max difference is 10mm from initial point
+            if ((use_clicky && !find_bed_clicky_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : 0.0f, nProbeRetryCount)) || (!use_clicky && !find_bed_induction_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : -10.f, nProbeRetryCount))) { //if we have data from z calibration max allowed difference is 1mm for each point, if we dont have data max difference is 10mm from initial point
 #else //CLICKY_BED_PROBE
             if (!find_bed_induction_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : -10.f, nProbeRetryCount)) { //if we have data from z calibration max allowed difference is 1mm for each point, if we dont have data max difference is 10mm from initial point
 #endif //CLICKY_BED_PROBE                printf_P(_T(MSG_BED_LEVELING_FAILED_POINT_LOW));
@@ -3014,9 +3025,16 @@ static void gcode_G80()
         }
 
 #ifdef PINDA_THERMISTOR
-        float offset_z = temp_compensation_pinda_thermistor_offset(current_temperature_pinda);
-        mbl.set_z(ix, iy, current_position[Z_AXIS] - offset_z); //store measured z values z_values[iy][ix] = z - offset_z;
-#else
+#ifdef CLICKY_BED_PROBE
+        if(use_clicky) {
+            mbl.set_z(ix, iy, current_position[Z_AXIS]);
+        } else
+#endif //CLICKY_BED_PROBE
+        {
+            float offset_z = temp_compensation_pinda_thermistor_offset(current_temperature_pinda);
+            mbl.set_z(ix, iy, current_position[Z_AXIS] - offset_z); //store measured z values z_values[iy][ix] = z - offset_z;
+        }
+#else //PINDA_THERMISTOR
         mbl.set_z(ix, iy, current_position[Z_AXIS]); //store measured z values z_values[iy][ix] = z;
 #endif //PINDA_THERMISTOR
 
@@ -3026,15 +3044,18 @@ static void gcode_G80()
     }
 
 #ifdef CLICKY_BED_PROBE
-    st_synchronize();
-    lcd_setstatuspgm(MSG_BED_LEVELING_DROPPING_OFF_CLICKY);
-    custom_message_type = CustomMsg::Status;
-    lcd_update(1);
-    if(!drop_off_clicky(mbl.z_values[0][MESH_NUM_X_POINTS - 1])) return;
-#else //CLICKY_BED_PROBE
-    current_position[Z_AXIS] = MESH_HOME_Z_SEARCH;
-    plan_buffer_line_curposXYZE(Z_LIFT_FEEDRATE);
+    if(use_clicky) {
+        st_synchronize();
+        lcd_setstatuspgm(MSG_BED_LEVELING_DROPPING_OFF_CLICKY);
+        custom_message_type = CustomMsg::Status;
+        lcd_update(1);
+        if(!drop_off_clicky(mbl.z_values[0][MESH_NUM_X_POINTS - 1])) return;
+    } else
 #endif //CLICKY_BED_PROBE
+    {
+        current_position[Z_AXIS] = MESH_HOME_Z_SEARCH;
+        plan_buffer_line_curposXYZE(Z_LIFT_FEEDRATE);
+    }
 
     st_synchronize();
     static uint8_t g80_fail_cnt = 0;
@@ -3082,7 +3103,10 @@ static void gcode_G80()
     clean_up_after_endstop_move(l_feedmultiply);
 
 #ifndef PINDA_THERMISTOR
-    if(eeprom_read_byte((uint8_t *)EEPROM_TEMP_CAL_ACTIVE) && calibration_status_pinda() == true) temp_compensation_apply(); //apply PINDA temperature compensation
+#ifdef CLICKY_BED_PROBE
+    if(!use_clicky)
+#endif //CLICKY_BED_PROBE
+        if(eeprom_read_byte((uint8_t *)EEPROM_TEMP_CAL_ACTIVE) && calibration_status_pinda() == true) temp_compensation_apply(); //apply PINDA temperature compensation
 #endif
     babystep_apply(); // Apply Z height correction aka baby stepping before mesh bed leveing gets activated.
     
@@ -3121,18 +3145,24 @@ static void gcode_G80()
 
     mbl.upsample_3x3(); //interpolation from 3x3 to 7x7 points using largrangian polynomials while using the same array z_values[iy][ix] for storing (just coppying measured data to new destination and interpolating between them)
 
-#ifndef CLICKY_BED_PROBE
-    uint8_t useMagnetCompensation = code_seen('M') ? code_value_uint8() : eeprom_read_byte((uint8_t*)EEPROM_MBL_MAGNET_ELIMINATION);
-    if (nMeasPoints == 7 && useMagnetCompensation) {
-        mbl_magnet_elimination();
-    }
-#else //CLICKY_BED_PROBE
-    //apply probe z-offset to decrease z-live calibration to bearable amounts in case of clicky probe (otherwise z-live could be in the -2mm+ range)
-      for (uint8_t row = 0; row < MESH_NUM_Y_POINTS; row++) {
-        for (uint8_t col = 0; col < MESH_NUM_X_POINTS; col++) {
-            mbl.z_values[row][col] += MBL_Z_PROBE_OFFSET_FROM_EXTRUDER;
+#ifdef CLICKY_BED_PROBE
+    if(!use_clicky)
+#endif
+    {
+        uint8_t useMagnetCompensation = code_seen('M') ? code_value_uint8() : eeprom_read_byte((uint8_t*)EEPROM_MBL_MAGNET_ELIMINATION);
+        if (nMeasPoints == 7 && useMagnetCompensation) {
+            mbl_magnet_elimination();
         }
-      }  
+    }
+#ifdef CLICKY_BED_PROBE
+    else {
+        //apply probe z-offset to decrease z-live calibration to bearable amounts in case of clicky probe (otherwise z-live could be in the -2mm+ range)
+        for (uint8_t row = 0; row < MESH_NUM_Y_POINTS; row++) {
+            for (uint8_t col = 0; col < MESH_NUM_X_POINTS; col++) {
+                mbl.z_values[row][col] += MBL_Z_PROBE_OFFSET_FROM_EXTRUDER;
+            }
+        }
+    }
 #endif //CLICKY_BED_PROBE
     mbl.active = 1; //activate mesh bed leveling
     /*
@@ -4711,27 +4741,32 @@ void process_commands()
     The maximum travel distance before an error is triggered is 10mm.
         #### Usage
 	  
-          G30 [ K ]
+          G30 [ C | S | ]
       
 	#### Parameters (ONLY FOR CLICKY PROBE!!!)
       - `K` - if added will keep clicky probe after probing (useful for multiple consequitive probes so as not to keep picking up & dropping off probe after each point)
+      - 'S' - if added will use the pinda probe instead of clicky (will auto-deposit clicky at start if it is attached)
     */
     case 30: 
         {
 
 #ifdef CLICKY_BED_PROBE
+            const bool use_clicky = !code_seen('K');
             float XY_AXIS_FEEDRATE = (homing_feedrate[X_AXIS] * 3) / 60;
             float Z_LIFT_FEEDRATE = homing_feedrate[Z_AXIS] / 60;
             float old_xyz[3] = {current_position[0], current_position[1], current_position[3]};
             
             pick_up_clicky();
             st_synchronize();
-            current_position[Z_AXIS] += 3;
-            plan_buffer_line_curposXYZE(Z_LIFT_FEEDRATE);
 
-            for(int_least8_t i = 0; i < 3; i++) current_position[i] = old_xyz[i];
-            world2machine_clamp(current_position[X_AXIS], current_position[Y_AXIS]);
-            plan_buffer_line_curposXYZE(XY_AXIS_FEEDRATE);
+            if(use_clicky) {
+                current_position[Z_AXIS] += 3;
+                plan_buffer_line_curposXYZE(Z_LIFT_FEEDRATE);
+
+                for(int_least8_t i = 0; i < 3; i++) current_position[i] = old_xyz[i];
+                world2machine_clamp(current_position[X_AXIS], current_position[Y_AXIS]);
+                plan_buffer_line_curposXYZE(XY_AXIS_FEEDRATE);
+            }
 #endif //CLICKY_BED_PROBE
             st_synchronize();
             homing_flag = true;
@@ -4742,15 +4777,16 @@ void process_commands()
             feedrate = homing_feedrate[Z_AXIS];
 
 #ifdef CLICKY_BED_PROBE
-            find_bed_clicky_sensor_point_z(0.0f, 3);
-#else //CLICKY_BED_PROBE
-            find_bed_induction_sensor_point_z(-10.0f, 3);
+            if(use_clicky)
+                find_bed_clicky_sensor_point_z(0.0f, 3);
+            else
 #endif //CLICKY_BED_PROBE
+                find_bed_induction_sensor_point_z(-10.0f, 3);
 
 			printf_P(_N("%S X: %.5f Y: %.5f Z: %.5f\n"), _T(MSG_BED), _x, _y, _z);
 
 #ifdef CLICKY_BED_PROBE
-            if(!code_seen('K'))
+            if(use_clicky && !code_seen('K'))
             {
                 drop_off_clicky(mbl.active? mbl.z_values[0][MESH_NUM_X_POINTS-1] : -2);
                 for(int_least8_t i = 0; i < 3; i++) current_position[i] = old_xyz[i];
@@ -5061,13 +5097,14 @@ void process_commands()
     Default 3x3 grid can be changed on MK2.5/s and MK3/s to 7x7 grid.
     #### Usage
 	  
-          G80 [ N | C | O | M | L | R | F | B | X | Y | W | H ]
+          G80 [ N | C | O | M | L | R | F | B | X | Y | W | H | S ]
       
 	#### Parameters
       - `N` - Number of mesh points on x axis. Default is value stored in EEPROM. Valid values are 3 and 7.
       - `C` - Probe retry counts. Default is value stored in EEPROM. Valid values are 1 to 10.
       - `O` - Return to origin. Default is 1. Valid values are 0 (false) and 1 (true).
       - `M` - Use magnet compensation. Will only be used if number of mesh points is set to 7. Default is value stored in EEPROM. Valid values are 0 (false) and 1 (true).
+      - 'S' - Use Pinda probing for MBL instead of clicky (if clicky is enabled - if its disabled this parameter does nothing)
       
       Using the following parameters enables additional "manual" bed leveling correction. Valid values are -100 microns to 100 microns.
     #### Additional Parameters
