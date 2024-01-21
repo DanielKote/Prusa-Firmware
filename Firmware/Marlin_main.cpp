@@ -3135,7 +3135,7 @@ static void gcode_G80()
       }  
 #endif //CLICKY_BED_PROBE
     mbl.active = 1; //activate mesh bed leveling
-    ///*
+    /*
     //Print out the bed measurements data for dev purposes
     SERIAL_ECHOPGM("\nBED DATA\n");
     for(int_least8_t i = 0; i < 7; i++)

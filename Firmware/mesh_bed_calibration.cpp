@@ -3129,6 +3129,7 @@ bool sample_mesh_and_store_reference()
         }
     }
 
+    /*
     //Print out the bed measurements data for dev purposes
     SERIAL_ECHOPGM("\nBED Z-JITTER DATA\n");
     for(int_least8_t i = 0; i < 3; i++)
@@ -3140,6 +3141,7 @@ bool sample_mesh_and_store_reference()
         }
         SERIAL_ECHOPGM("\n");
     }
+    //*/
 
     // Store the correction values to EEPROM.
     // Offsets of the Z heiths of the calibration points from the first point.
