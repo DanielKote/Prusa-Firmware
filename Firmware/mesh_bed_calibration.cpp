@@ -31,7 +31,7 @@ float clicky_dock_z = 0; //last pickup's z for when the dock was located (used f
 
 #ifdef CLICKY_BED_PROBE
 #define CLICKY_PICKUP_Z 5           //Z height (above the z=0 measured by pinda probe!) for picking up clicky (should have a 2-3mm gap between magnet and pin)
-#define CLICKY_DOCK_X X_MAX_POS - 0 //X position of dock (current design places it at max X position to allow for use of the full 250mm of bed)
+#define CLICKY_DOCK_X X_MAX_POS - 0.2 //X position of dock (current design places it at almost max X position to allow for use of the full 250mm of bed, 0.2 just to keep extruder from bumping into endpoint)
 #define CLICKY_PIN_LENGTH 10        //Length of clicky pin - when pin is picked up the extruder moves up by this length to clear the dock
 #endif
 
