@@ -2793,7 +2793,7 @@ static void gcode_G28(bool home_x_axis, bool home_y_axis, bool home_z_axis)
 static void gcode_G80()
 {
 #ifdef CLICKY_BED_PROBE
-    const bool use_clicky = !code_seen('K');
+    const bool use_clicky = !code_seen('S');
 #endif
 
     constexpr float XY_AXIS_FEEDRATE = (homing_feedrate[X_AXIS] * 3) / 60;
