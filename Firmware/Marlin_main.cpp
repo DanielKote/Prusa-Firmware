@@ -3237,6 +3237,88 @@ static void gcode_G81_M420()
     return;
 }
 
+#ifdef CLICKY_BED_PROBE
+//pick up clicky
+bool gcode_G201()
+{
+    st_synchronize();
+    float XY_AXIS_FEEDRATE = (homing_feedrate[X_AXIS] * 3) / 60;
+    float Z_LIFT_FEEDRATE = homing_feedrate[Z_AXIS] / 60;
+    float old_xyz[3] = {current_position[0], current_position[1], current_position[2]};
+    if(!pick_up_clicky()) return false;
+
+    st_synchronize();
+    current_position[Z_AXIS] += 3;
+    plan_buffer_line_curposXYZE(Z_LIFT_FEEDRATE);
+
+    for(int_least8_t i = 0; i < 2; i++) current_position[i] = old_xyz[i];
+    world2machine_clamp(current_position[X_AXIS], current_position[Y_AXIS]);
+    plan_buffer_line_curposXYZE(XY_AXIS_FEEDRATE);
+
+    if(old_xyz[Z_AXIS] < 20) {
+        find_bed_clicky_sensor_point_z(0.0f, 1);
+
+        st_synchronize();
+        if(current_position[Z_AXIS] < old_xyz[Z_AXIS]) {
+            old_xyz[Z_AXIS] = current_position[Z_AXIS];
+        }
+    }
+    current_position[Z_AXIS] = old_xyz[Z_AXIS];
+    plan_buffer_line_curposXYZE(Z_LIFT_FEEDRATE);
+    st_synchronize();
+    return true;
+}
+
+//drop off clicky
+bool gcode_G202()
+{
+    st_synchronize();
+    float XY_AXIS_FEEDRATE = (homing_feedrate[X_AXIS] * 3) / 60;
+    float Z_LIFT_FEEDRATE = homing_feedrate[Z_AXIS] / 60;
+    float old_xyz[3] = {current_position[0], current_position[1], current_position[2]};
+    if(!drop_off_clicky()) return false;
+
+    st_synchronize();
+    current_position[Z_AXIS] += 5;
+    plan_buffer_line_curposXYZE(Z_LIFT_FEEDRATE);
+    for(int_least8_t i = 0; i < 2; i++) current_position[i] = old_xyz[i];
+    world2machine_clamp(current_position[X_AXIS], current_position[Y_AXIS]);
+    plan_buffer_line_curposXYZE(XY_AXIS_FEEDRATE);
+    current_position[Z_AXIS] = old_xyz[Z_AXIS];
+    plan_buffer_line_curposXYZE(Z_LIFT_FEEDRATE);
+    st_synchronize();
+    return true;
+}
+
+//preheat clicky
+bool gcode_G203()
+{
+    float time = 60000.0f;
+    if(code_seen('S')) time = code_value() * 1000;
+
+    if(!gcode_G201()) return false; //pick up clicky if it isnt already attached
+    find_bed_clicky_sensor_point_z(-1.0f, 1);
+    st_synchronize();
+
+    if(time != 0)
+    {
+        if(custom_message_type != CustomMsg::M117)
+        {
+          LCD_MESSAGERPGM(_n("Sleep..."));////MSG_DWELL
+        }
+    }
+    time += _millis();  // keep track of when we started waiting
+    previous_millis_cmd.start();
+    while(_millis() < time) {
+        manage_heater();
+        manage_inactivity();
+        lcd_update(0);
+    }
+    return true;
+}
+
+#endif
+
 //! @brief Calibrate XYZ
 //! @param onlyZ if true, calibrate only Z axis
 //! @param verbosity_level
@@ -3975,6 +4057,10 @@ extern uint8_t st_backlash_y;
 //!@n G90 - Use Absolute Coordinates
 //!@n G91 - Use Relative Coordinates
 //!@n G92 - Set current position to coordinates given
+//!@n G201 - Pick up clicky
+//!@n G201 - Drop off clicky
+//!@n G201 - Preheat clicky
+
 //!
 //!@n M Codes
 //!@n M0   - Unconditional stop - Wait for user to press a button on the LCD
@@ -4781,20 +4867,10 @@ void process_commands()
 
 #ifdef CLICKY_BED_PROBE
             const bool use_clicky = !code_seen('K');
-            float XY_AXIS_FEEDRATE = (homing_feedrate[X_AXIS] * 3) / 60;
-            float Z_LIFT_FEEDRATE = homing_feedrate[Z_AXIS] / 60;
-            float old_xyz[3] = {current_position[0], current_position[1], current_position[3]};
-            
-            pick_up_clicky();
             st_synchronize();
 
             if(use_clicky) {
-                current_position[Z_AXIS] += 3;
-                plan_buffer_line_curposXYZE(Z_LIFT_FEEDRATE);
-
-                for(int_least8_t i = 0; i < 3; i++) current_position[i] = old_xyz[i];
-                world2machine_clamp(current_position[X_AXIS], current_position[Y_AXIS]);
-                plan_buffer_line_curposXYZE(XY_AXIS_FEEDRATE);
+                gcode_G201(); //pick up clicky
             }
 #endif //CLICKY_BED_PROBE
             st_synchronize();
@@ -4817,10 +4893,7 @@ void process_commands()
 #ifdef CLICKY_BED_PROBE
             if(use_clicky && !code_seen('K'))
             {
-                drop_off_clicky(mbl.active? mbl.z_values[0][MESH_NUM_X_POINTS-1] : -2);
-                for(int_least8_t i = 0; i < 3; i++) current_position[i] = old_xyz[i];
-                world2machine_clamp(current_position[X_AXIS], current_position[Y_AXIS]);
-                plan_buffer_line_curposXYZE(XY_AXIS_FEEDRATE);
+                gcode_G202(); //drop off clicky
             }
 #endif //CLICKY_BED_PROBE
             clean_up_after_endstop_move(l_feedmultiply);
@@ -5299,6 +5372,42 @@ void process_commands()
         gcode_G92();
     }
     break;
+
+#ifdef CLICKY_BED_PROBE
+
+    /*!
+    ### G201 - Pick up clicky probe and return to current position
+    */
+   case 201: {
+        gcode_G201();
+   }
+    break;
+
+    /*!
+    ### G202 - Drop off clicky probe and return to current position
+    */
+   case 202: {
+        gcode_G202();
+   }
+   break;
+
+
+    /*!
+    ### G203 - Probe the bed (with clicky probe) and hold still for 1 min (or as set by S parameter) before raising back to current position
+        #### Usage
+	
+	      G203 [ S ]
+	
+	#### Parameters
+	  - `S` - time (in seconds) to hold the probe against the bed surface (60s default)
+    */
+   case 203: {
+        gcode_G203();
+   }
+   break;
+
+
+#endif //CLICKY_BED_PROBE
 
 #ifdef PRUSA_FARM
     /*!
