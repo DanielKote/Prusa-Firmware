@@ -29,16 +29,10 @@ float clicky_dock_z = 0; //last pickup's z for when the dock was located (used f
 #define WEIGHT_FIRST_ROW_Y_HIGH (0.3f)
 #define WEIGHT_FIRST_ROW_Y_LOW  (0.0f)
 
-#ifdef CLICKY_BED_PROBE
-#define CLICKY_PICKUP_Z 5           //Z height (above the z=0 measured by pinda probe!) for picking up clicky (should have a 2-3mm gap between magnet and pin)
-#define CLICKY_DOCK_X X_MAX_POS - 0.2 //X position of dock (current design places it at almost max X position to allow for use of the full 250mm of bed, 0.2 just to keep extruder from bumping into endpoint)
-#define CLICKY_PIN_LENGTH 10        //Length of clicky pin - when pin is picked up the extruder moves up by this length to clear the dock
-#endif
-
 #define Z_SENSOR_HIGH_VARIANCE_RETEST //if defined then after z-search is finished its required iterations it will check if average & max deviation is within bounds - if not then retry
 #ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
-#define Z_SENSOR_ALLOWED_AVG_DEVIATION 0.004
-#define Z_SENSOR_ALLOWED_MAX_DEVIATION 0.008
+#define Z_SENSOR_ALLOWED_AVG_DEVIATION 0.005
+#define Z_SENSOR_ALLOWED_MAX_DEVIATION 0.010
 #define Z_SENSOR_ALLOWED_MAX_RETRIES 6 //if we were forced to retry over 6 times then fail - clearly something is wrong...
 #endif //Z_SENSOR_HIGH_VARIANCE_RETEST
 
@@ -2935,7 +2929,14 @@ bool pick_up_clicky()
             kill(_T(MSG_BED_LEVELING_FAILED_CLICKY_PIN_NOT_FOIND));
             return false;
         }
-        clicky_dock_z = current_position[Z_AXIS] + 1;
+        current_position[Z_AXIS] += 0.5f;
+        go_to_current(homing_feedrate[Z_AXIS]/60);
+        if(!find_bed_clicky_sensor_point_z(-5, 1))
+        {
+            kill(_T(MSG_BED_LEVELING_FAILED_CLICKY_PIN_NOT_FOIND));
+            return false;
+        }
+        clicky_dock_z = current_position[Z_AXIS];
 
         current_position[Z_AXIS] += CLICKY_PIN_LENGTH;
         go_to_current(homing_feedrate[Z_AXIS]/60);
@@ -2967,7 +2968,7 @@ bool drop_off_clicky(float expected_z)
         current_position[X_AXIS] = CLICKY_DOCK_X;
         current_position[Y_AXIS] = 0;
         go_to_current(homing_feedrate[X_AXIS]/15);
-        current_position[Z_AXIS] = clicky_dock_z;
+        current_position[Z_AXIS] = clicky_dock_z + 0.2f;
         go_to_current(homing_feedrate[Z_AXIS]/60);
 
         //wipe off the clicky pin by moving sideways (slowly) for the first 5mm, then go to a point guaranteed to be over build-plate
@@ -2977,7 +2978,7 @@ bool drop_off_clicky(float expected_z)
         go_to_current(homing_feedrate[X_AXIS]/15);
 
         //try to find the bed, but not too hard - if we fail to find the bed that is good! that means that the clicky pin was depsoted correctly (if the bed is found, then that means pin is still on the probe... error!)
-        if(find_bed_clicky_sensor_point_z(expected_z - 1, 1))
+        if(find_bed_clicky_sensor_point_z(expected_z - 0.5, 1))
         {
             lift_z_then_kill(_T(MSG_BED_LEVELING_FAILED_CANT_DEPOSIT_CLICKY_PIN));
             return false;
@@ -3091,7 +3092,7 @@ bool sample_mesh_and_store_reference()
         lcd_printf_P(PSTR("%d/9"),mesh_point+1);
 #endif /* MESH_BED_CALIBRATION_SHOW_LCD */
 #ifdef CLICKY_BED_PROBE
-		if (!find_bed_clicky_sensor_point_z(-1)) //Z crash or deviation > 50um
+		if (!find_bed_clicky_sensor_point_z(-2)) //Z crash or deviation > 50um
 #else //CLICKY_BED_PROBE
         if (!find_bed_induction_sensor_point_z()) //Z crash or deviation > 50um
 #endif //CLICKY_BED_PROBE

@@ -2804,7 +2804,7 @@ static void gcode_G80()
     float XY_AXIS_FEEDRATE = (homing_feedrate[X_AXIS] * 3) / 60;
 #ifdef CLICKY_BED_PROBE
     const float Z_LIFT_FEEDRATE = use_clicky? homing_feedrate[Z_AXIS] / 30 : homing_feedrate[Z_AXIS] / 60;
-    const float Z_CALIBRATION_THRESHOLD = use_clicky? 0.5f : 0.35f;
+    const float Z_CALIBRATION_THRESHOLD = 0.5f;
     const float MESH_HOME_Z_SEARCH_FAST = use_clicky? 1.0f : 0.35f; //physical probe needs to move up higher to ensure it doesnt collide with bed during move operations
 #else
     const float Z_LIFT_FEEDRATE = homing_feedrate[Z_AXIS] / 60;
@@ -3242,7 +3242,7 @@ static void gcode_G81_M420()
 bool gcode_G201()
 {
     st_synchronize();
-    float XY_AXIS_FEEDRATE = (homing_feedrate[X_AXIS] * 3) / 60;
+    float XY_AXIS_FEEDRATE = (homing_feedrate[X_AXIS] * 4) / 60;
     float Z_LIFT_FEEDRATE = homing_feedrate[Z_AXIS] / 60;
     float old_xyz[3] = {current_position[0], current_position[1], current_position[2]};
     if(!pick_up_clicky()) return false;
@@ -3273,7 +3273,7 @@ bool gcode_G201()
 bool gcode_G202()
 {
     st_synchronize();
-    float XY_AXIS_FEEDRATE = (homing_feedrate[X_AXIS] * 3) / 60;
+    float XY_AXIS_FEEDRATE = (homing_feedrate[X_AXIS] * 4) / 60;
     float Z_LIFT_FEEDRATE = homing_feedrate[Z_AXIS] / 60;
     float old_xyz[3] = {current_position[0], current_position[1], current_position[2]};
     if(!drop_off_clicky()) return false;
@@ -3293,23 +3293,22 @@ bool gcode_G202()
 //preheat clicky
 bool gcode_G203()
 {
-    float time = 60000.0f;
-    if(code_seen('S')) time = code_value() * 1000;
+    float XY_AXIS_FEEDRATE = (homing_feedrate[X_AXIS] * 4) / 60;
+    float Z_LIFT_FEEDRATE = homing_feedrate[Z_AXIS] / 60;
+    unsigned long c_time = code_seen('S')? code_value() * 1000 : 10000;
+    current_position[Z_AXIS] += 5;
+    plan_buffer_line_curposXYZE(Z_LIFT_FEEDRATE);
+    current_position[X_AXIS] = X_MAX_POS - 50;
+    current_position[Y_AXIS] = -2;
+    plan_buffer_line_curposXYZE(XY_AXIS_FEEDRATE);
+    st_synchronize();
 
     if(!gcode_G201()) return false; //pick up clicky if it isnt already attached
     find_bed_clicky_sensor_point_z(-1.0f, 1);
     st_synchronize();
-
-    if(time != 0)
-    {
-        if(custom_message_type != CustomMsg::M117)
-        {
-          LCD_MESSAGERPGM(_n("Sleep..."));////MSG_DWELL
-        }
-    }
-    time += _millis();  // keep track of when we started waiting
+    c_time += _millis();  // keep track of when we started waiting
     previous_millis_cmd.start();
-    while(_millis() < time) {
+    while(_millis() < c_time) {
         manage_heater();
         manage_inactivity();
         lcd_update(0);
@@ -5393,13 +5392,13 @@ void process_commands()
 
 
     /*!
-    ### G203 - Probe the bed (with clicky probe) and hold still for 1 min (or as set by S parameter) before raising back to current position
+    ### G203 - Probe the bed (with clicky probe) and hold still for 10s (or as set by S parameter) before raising back to current position
         #### Usage
 	
 	      G203 [ S ]
 	
 	#### Parameters
-	  - `S` - time (in seconds) to hold the probe against the bed surface (60s default)
+	  - `S` - time (in seconds) to hold the probe against the bed surface (10s default)
     */
    case 203: {
         gcode_G203();
