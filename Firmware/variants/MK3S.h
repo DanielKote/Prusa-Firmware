@@ -249,7 +249,7 @@
 
 // Safety timer
 #define SAFETYTIMER
-#define DEFAULT_SAFETYTIMER_TIME_MINS 30
+#define DEFAULT_SAFETYTIMER_TIME_MINS 90
 
 // Offline crash dumper
 #define XFLASH_DUMP     // enable dump functionality (including D20/D21/D22)
