@@ -2799,7 +2799,7 @@ static void gcode_G80()
     constexpr float XY_AXIS_FEEDRATE = (homing_feedrate[X_AXIS] * 3) / 60;
 #ifdef CLICKY_BED_PROBE
     const float Z_LIFT_FEEDRATE = use_clicky? homing_feedrate[Z_AXIS] / 30 : homing_feedrate[Z_AXIS] / 60;
-    const float Z_CALIBRATION_THRESHOLD = use_clicky? 0.5f : 0.35f;
+    const float Z_CALIBRATION_THRESHOLD = 0.5f;
     const float MESH_HOME_Z_SEARCH_FAST = use_clicky? 1.0f : 0.35f; //physical probe needs to move up higher to ensure it doesnt collide with bed during move operations
 #else
     constexpr float Z_LIFT_FEEDRATE = homing_feedrate[Z_AXIS] / 60;

@@ -29,16 +29,10 @@ float clicky_dock_z = 0; //last pickup's z for when the dock was located (used f
 #define WEIGHT_FIRST_ROW_Y_HIGH (0.3f)
 #define WEIGHT_FIRST_ROW_Y_LOW  (0.0f)
 
-#ifdef CLICKY_BED_PROBE
-#define CLICKY_PICKUP_Z 5           //Z height (above the z=0 measured by pinda probe!) for picking up clicky (should have a 2-3mm gap between magnet and pin)
-#define CLICKY_DOCK_X X_MAX_POS - 0 //X position of dock (current design places it at max X position to allow for use of the full 250mm of bed)
-#define CLICKY_PIN_LENGTH 10        //Length of clicky pin - when pin is picked up the extruder moves up by this length to clear the dock
-#endif
-
 #define Z_SENSOR_HIGH_VARIANCE_RETEST //if defined then after z-search is finished its required iterations it will check if average & max deviation is within bounds - if not then retry
 #ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
-#define Z_SENSOR_ALLOWED_AVG_DEVIATION 0.004
-#define Z_SENSOR_ALLOWED_MAX_DEVIATION 0.008
+#define Z_SENSOR_ALLOWED_AVG_DEVIATION 0.005
+#define Z_SENSOR_ALLOWED_MAX_DEVIATION 0.010
 #define Z_SENSOR_ALLOWED_MAX_RETRIES 6 //if we were forced to retry over 6 times then fail - clearly something is wrong...
 #endif //Z_SENSOR_HIGH_VARIANCE_RETEST
 
