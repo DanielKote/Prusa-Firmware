@@ -755,7 +755,7 @@
 
 #define MBL_X_PROBE_OFFSET_FROM_EXTRUDER (X_PROBE_OFFSET_FROM_EXTRUDER + 5.5)
 #define MBL_Y_PROBE_OFFSET_FROM_EXTRUDER (Y_PROBE_OFFSET_FROM_EXTRUDER - 9)
-#define MBL_Z_PROBE_OFFSET_FROM_EXTRUDER -1 //Z offset is used as an extra 'plus' for MBL so as to decrease the z-live offset that needs to be set. WARNING! still has to be small enough (closer to 0) that the z-live is -ve!
+#define MBL_Z_PROBE_OFFSET_FROM_EXTRUDER -2 //Z offset is used as an extra 'plus' for MBL so as to decrease the z-live offset that needs to be set. WARNING! still has to be small enough (closer to 0) that the z-live is -ve! Ideally this would be the difference between PINDA measurements and clicky measurements (so live-z would result in ~ -1.600).
 #else //CLICKY_BED_PROBE
 #define MBL_X_PROBE_OFFSET_FROM_EXTRUDER (X_PROBE_OFFSET_FROM_EXTRUDER)
 #define MBL_Y_PROBE_OFFSET_FROM_EXTRUDER (Y_PROBE_OFFSET_FROM_EXTRUDER)
