@@ -1,3 +1,7 @@
+# FULL CUSTOM:
+
+This is my own personal branch which includes all changes (plus a few extra ones) for my own MK3 printer. Due to the number of mods I have added it isnt exactly a good branch to use as a copy - best to clone the stock MK3 from prusa and then implement any of the changes you want from the other branches - each of which is its own separate 'mod'.
+
 # Prusa Firmware MK3
 
 This repository contains the source code and the development versions of the firmware running on the [Original Prusa i3](https://prusa3d.com/) MK3S/MK3/MK2.5S/MK2.5 line of printers.
