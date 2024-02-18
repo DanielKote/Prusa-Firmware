@@ -2843,6 +2843,9 @@ static void gcode_G80()
     if (uint8_t codeSeen = code_seen('C'), value = code_value_uint8(); codeSeen && value >= 1 && value <= 10)
       nProbeRetryCount = value;
 
+    float sampling_feedrate_multiplier = code_seen('Z')? code_value() : 1.0f;
+    sampling_feedrate_multiplier = sampling_feedrate_multiplier > 4.0f? 4.0f : sampling_feedrate_multiplier < 0.1f? 0.1f : sampling_feedrate_multiplier;
+
     const float area_min_x = code_seen('X') ? code_value() - x_mesh_density - MBL_X_PROBE_OFFSET_FROM_EXTRUDER : -INFINITY;
     const float area_min_y = code_seen('Y') ? code_value() - y_mesh_density - MBL_Y_PROBE_OFFSET_FROM_EXTRUDER : -INFINITY;
     const float area_max_x = code_seen('W') ? area_min_x + code_value() + 2 * x_mesh_density : INFINITY;
@@ -2871,7 +2874,7 @@ static void gcode_G80()
         world2machine_clamp(current_position[X_AXIS], current_position[Y_AXIS]);
         plan_buffer_line_curposXYZE(XY_AXIS_FEEDRATE);
         st_synchronize();
-        if (!find_bed_clicky_sensor_point_z( -1.0f, nProbeRetryCount)) {
+        if (!find_bed_clicky_sensor_point_z( -1.0f, nProbeRetryCount, sampling_feedrate_multiplier)) {
             kill(_i("Mesh bed leveling failed. Cant find 0,0 point")); ////MSG_MBL_ZZ_FAIL c=20 r=2?
         }
         st_synchronize();
@@ -2993,9 +2996,9 @@ static void gcode_G80()
 
         // Go down until endstop is hit
 #ifdef CLICKY_BED_PROBE
-        if ((use_clicky && !find_bed_clicky_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : 0.0f, nProbeRetryCount)) || (!use_clicky && !find_bed_induction_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : -10.f, nProbeRetryCount))) { //if we have data from z calibration max allowed difference is 1mm for each point, if we dont have data max difference is 10mm from initial point
+        if ((use_clicky && !find_bed_clicky_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : 0.0f, nProbeRetryCount, sampling_feedrate_multiplier)) || (!use_clicky && !find_bed_induction_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : -10.f, nProbeRetryCount, sampling_feedrate_multiplier))) { //if we have data from z calibration max allowed difference is 1mm for each point, if we dont have data max difference is 10mm from initial point
 #else //CLICKY_BED_PROBE
-        if (!find_bed_induction_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : -10.f, nProbeRetryCount)) { //if we have data from z calibration max allowed difference is 1mm for each point, if we dont have data max difference is 10mm from initial point
+        if (!find_bed_induction_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : -10.f, nProbeRetryCount, sampling_feedrate_multiplier)) { //if we have data from z calibration max allowed difference is 1mm for each point, if we dont have data max difference is 10mm from initial point
 #endif //CLICKY_BED_PROBE
             printf_P(_T(MSG_BED_LEVELING_FAILED_POINT_LOW));
             printf_P(PSTR("\nFAILURE!!!! probe point %d, %d : expected: %.3f, actual: %.3f, difference: %.3f\n"), ix, iy, z0, current_position[Z_AXIS], z0 - current_position[Z_AXIS]);
@@ -3008,9 +3011,9 @@ static void gcode_G80()
             st_synchronize();
 
 #ifdef CLICKY_BED_PROBE
-            if ((use_clicky && !find_bed_clicky_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : 0.0f, nProbeRetryCount)) || (!use_clicky && !find_bed_induction_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : -10.f, nProbeRetryCount))) { //if we have data from z calibration max allowed difference is 1mm for each point, if we dont have data max difference is 10mm from initial point
+            if ((use_clicky && !find_bed_clicky_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : 0.0f, nProbeRetryCount, sampling_feedrate_multiplier)) || (!use_clicky && !find_bed_induction_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : -10.f, nProbeRetryCount, sampling_feedrate_multiplier))) { //if we have data from z calibration max allowed difference is 1mm for each point, if we dont have data max difference is 10mm from initial point
 #else //CLICKY_BED_PROBE
-            if (!find_bed_induction_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : -10.f, nProbeRetryCount)) { //if we have data from z calibration max allowed difference is 1mm for each point, if we dont have data max difference is 10mm from initial point
+            if (!find_bed_induction_sensor_point_z(has_z ? z0 - Z_CALIBRATION_THRESHOLD : -10.f, nProbeRetryCount, sampling_feedrate_multiplier)) { //if we have data from z calibration max allowed difference is 1mm for each point, if we dont have data max difference is 10mm from initial point
 #endif //CLICKY_BED_PROBE                printf_P(_T(MSG_BED_LEVELING_FAILED_POINT_LOW));
                break;
             }
@@ -4826,17 +4829,21 @@ void process_commands()
     The maximum travel distance before an error is triggered is 10mm.
         #### Usage
 	  
-          G30 [ C | S | ]
+          G30 [ C | S | Z]
       
 	#### Parameters (ONLY FOR CLICKY PROBE!!!)
       - `K` - if added will keep clicky probe after probing (useful for multiple consequitive probes so as not to keep picking up & dropping off probe after each point)
       - 'S' - if added will use the pinda probe instead of clicky (will auto-deposit clicky at start if it is attached)
+      - 'Z' - z sampling speed multiplier. Valid values are 0.1 to 4.0
     */
     case 30: 
         {
+            float sampling_feedrate_multiplier = code_seen('Z')? code_value() : 1.0f;
+            sampling_feedrate_multiplier = sampling_feedrate_multiplier > 4.0f? 4.0f : sampling_feedrate_multiplier < 0.1f? 0.1f : sampling_feedrate_multiplier;
 
 #ifdef CLICKY_BED_PROBE
             const bool use_clicky = !code_seen('K');
+
             st_synchronize();
 
             if(use_clicky) {
@@ -4853,10 +4860,10 @@ void process_commands()
 
 #ifdef CLICKY_BED_PROBE
             if(use_clicky)
-                find_bed_clicky_sensor_point_z(0.0f, 3);
+                find_bed_clicky_sensor_point_z(0.0f, 3, sampling_feedrate_multiplier);
             else
 #endif //CLICKY_BED_PROBE
-                find_bed_induction_sensor_point_z(-10.0f, 3);
+                find_bed_induction_sensor_point_z(-10.0f, 3, sampling_feedrate_multiplier);
 
 			printf_P(_N("%S X: %.5f Y: %.5f Z: %.5f\n"), _T(MSG_BED), _x, _y, _z);
 
@@ -5169,7 +5176,7 @@ void process_commands()
     Default 3x3 grid can be changed on MK2.5/s and MK3/s to 7x7 grid.
     #### Usage
 	  
-          G80 [ N | C | O | M | L | R | F | B | X | Y | W | H | S ]
+          G80 [ N | C | O | M | L | R | F | B | X | Y | W | H | S | Z ]
       
 	#### Parameters
       - `N` - Number of mesh points on x axis. Default is value stored in EEPROM. Valid values are 3 and 7.
@@ -5177,6 +5184,7 @@ void process_commands()
       - `O` - Return to origin. Default is 1. Valid values are 0 (false) and 1 (true).
       - `M` - Use magnet compensation. Will only be used if number of mesh points is set to 7. Default is value stored in EEPROM. Valid values are 0 (false) and 1 (true).
       - 'S' - Use Pinda probing for MBL instead of clicky (if clicky is enabled - if its disabled this parameter does nothing)
+      - 'Z' - z sampling speed multiplier. Valid values are 0.1 to 4.0
       
       Using the following parameters enables additional "manual" bed leveling correction. Valid values are -100 microns to 100 microns.
     #### Additional Parameters

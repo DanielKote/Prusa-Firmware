@@ -176,10 +176,10 @@ enum BedSkewOffsetDetectionResultType {
 	BED_SKEW_OFFSET_DETECTION_SKEW_EXTREME		= 2   //!< Extremely skewed.
 };
 
-bool find_z_sensor_point_z(float minimum_z, uint8_t n_iter, int verbosity_level, bool clicky);
-FORCE_INLINE bool find_bed_induction_sensor_point_z(float minimum_z = -10.f, uint8_t n_iter = 3, int verbosity_level = 0) {return find_z_sensor_point_z(minimum_z, n_iter, verbosity_level, false); }
+bool find_z_sensor_point_z(float minimum_z, uint8_t n_iter,  float feedrate_multi, int verbosity_level, bool clicky);
+FORCE_INLINE bool find_bed_induction_sensor_point_z(float minimum_z = -10.f, uint8_t n_iter = 3, float feedrate_multi = 1.0f, int verbosity_level = 0) {return find_z_sensor_point_z(minimum_z, n_iter, feedrate_multi, verbosity_level, false); }
 #ifdef CLICKY_BED_PROBE
-FORCE_INLINE bool find_bed_clicky_sensor_point_z(float minimum_z = -10.f, uint8_t n_iter = 3, int verbosity_level = 0) {return find_z_sensor_point_z(minimum_z, n_iter, verbosity_level, true); }
+FORCE_INLINE bool find_bed_clicky_sensor_point_z(float minimum_z = -10.f, uint8_t n_iter = 3, float feedrate_multi = 1.0f, int verbosity_level = 0) {return find_z_sensor_point_z(minimum_z, n_iter, feedrate_multi, verbosity_level, true); }
 bool pick_up_clicky();
 bool drop_off_clicky(float expected_z = -1.0f);
 #endif //CLICKY_BED_PROBE
