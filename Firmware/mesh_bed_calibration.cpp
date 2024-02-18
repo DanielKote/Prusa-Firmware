@@ -951,7 +951,7 @@ static inline void update_current_position_z()
 }
 
 // At the current position, find the Z stop.
-bool find_z_sensor_point_z(float minimum_z, uint8_t n_iter, int
+bool find_z_sensor_point_z(float minimum_z, uint8_t n_iter, float feedrate_multi, int
 #ifdef SUPPORT_VERBOSITY
     verbosity_level
 #endif //SUPPORT_VERBOSITY
@@ -977,6 +977,7 @@ bool find_z_sensor_point_z(float minimum_z, uint8_t n_iter, int
 	#endif // SUPPORT_VERBOSITY
 	bool endstops_enabled  = enable_endstops(true);
     bool endstop_z_enabled = enable_z_endstop(false);
+    float z_search_feedrate = Z_SEARCH_FEEDRATE * feedrate_multi;
 #ifdef CLICKY_BED_PROBE
     bool clicky_enabled = enable_clicky_zprobe(use_clicky);
 #endif
@@ -1024,9 +1025,9 @@ bool find_z_sensor_point_z(float minimum_z, uint8_t n_iter, int
             current_position[Z_AXIS] = minimum_z;
             //printf_P(PSTR("init Z = %f, min_z = %f, i = %d\n"), z_bckp, minimum_z, i);
 #ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
-            go_to_current(Z_SEARCH_FEEDRATE * ((float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES - full_tries)/(float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES))); //for any retries conduct search with consequitively slower speeds
+            go_to_current(z_search_feedrate * ((float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES - full_tries)/(float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES))); //for any retries conduct search with consequitively slower speeds
 #else //Z_SENSOR_HIGH_VARIANCE_RETEST
-            go_to_current(Z_SEARCH_FEEDRATE);
+            go_to_current(z_search_feedrate);
 #endif //Z_SENSOR_HIGH_VARIANCE_RETEST
             // we have to let the planner know where we are right now as it is not where we said to go.
             update_current_position_z();
@@ -1036,9 +1037,9 @@ bool find_z_sensor_point_z(float minimum_z, uint8_t n_iter, int
                 raise_z(0.5);
                 current_position[Z_AXIS] = minimum_z;
 #ifdef Z_SENSOR_HIGH_VARIANCE_RETEST
-                go_to_current(Z_SEARCH_FEEDRATE * ((float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES - full_tries)/(float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES)));
+                go_to_current(z_search_feedrate * ((float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES - full_tries)/(float)(2 + Z_SENSOR_ALLOWED_MAX_RETRIES)));
 #else //Z_SENSOR_HIGH_VARIANCE_RETEST
-            go_to_current(Z_SEARCH_FEEDRATE);
+            go_to_current(z_search_feedrate);
 #endif //Z_SENSOR_HIGH_VARIANCE_RETEST
                 // we have to let the planner know where we are right now as it is not where we said to go.
                 update_current_position_z();
